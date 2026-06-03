@@ -34,7 +34,9 @@ def copy_into_build_context() -> None:
         dst = SCRIPT_DIR / name
         if dst.exists():
             shutil.rmtree(dst)
-        shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "sample.db"))
+        # "runtime" 제외 — 목적지(runtime/agents)가 src(agents) 안에 있어 재귀 폭주 방지.
+        # entrypoint는 agents.db_query_analysis_agent.runtime을 import하지 않으므로 안전.
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "sample.db", "runtime"))
     print(f"{GREEN}✅ build context 복사{NC}")
 
 
@@ -107,7 +109,7 @@ def main() -> None:
     keep += [f"RUNTIME_NAME={AGENT_NAME}", f"RUNTIME_ID={result.agent_id}", f"RUNTIME_ARN={result.agent_arn}"]
     env_file.write_text("\n".join(keep) + "\n")
     print(f"{GREEN}✅ 배포 완료 — RUNTIME_ARN .env 저장 ({datetime.now():%H:%M}){NC}")
-    print("   다음: uv run agents/db_query_analysis_agent/runtime/invoke_runtime.py --query \"SELECT * FROM orders WHERE user_id=1\"")
+    print("   다음: uv run python -m agents.db_query_analysis_agent.runtime.invoke_runtime --query \"SELECT * FROM orders WHERE user_id=1\"")
 
 
 if __name__ == "__main__":
