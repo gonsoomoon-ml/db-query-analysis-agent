@@ -44,8 +44,8 @@ def extract_table_names(sql: str) -> list[str]:
     return names
 
 
-def collect_table_meta(sql: str) -> dict:
-    """추출 테이블별 메타 + large_table 플래그. backend/threshold 동봉."""
+def table_meta_core(sql: str) -> dict:
+    """추출 테이블별 메타 + large_table 플래그(순수 함수 — @tool/Lambda 공유 진입점). backend/threshold 동봉."""
     threshold = int(os.environ.get("LARGE_TABLE_THRESHOLD", "1000000"))
     tables: list[dict] = []
     for name in extract_table_names(sql):
@@ -64,17 +64,6 @@ def collect_table_meta(sql: str) -> dict:
         })
     return {"tables": tables, "backend": current_backend(),
             "large_table_threshold": threshold}
-
-
-# Lambda 핸들러 등 외부에서 임포트할 수 있도록 공개 별칭 제공.
-# @tool 래퍼와 Lambda 핸들러 양쪽이 동일한 순수 함수를 호출한다.
-def table_meta_core(sql: str) -> dict:
-    """테이블 메타 조회 순수 함수 (Lambda/직접 호출 공유 진입점).
-
-    collect_table_meta 와 동일한 결과를 반환한다.
-    반환 형식: {"tables": [...], "backend": str, "large_table_threshold": int}
-    """
-    return collect_table_meta(sql)
 
 
 @tool

@@ -55,8 +55,11 @@ def _statement_violations(stmt: str) -> list[dict]:
     return v
 
 
-def evaluate_sql_rules(sql: str) -> dict:
-    """규칙 위반 목록 반환. 세미콜론 기준 문장 단위 평가 + 규칙명 dedup."""
+def check_rules_core(sql: str) -> dict:
+    """규칙 위반 목록 반환(순수 함수 — @tool 래퍼와 Lambda 핸들러 공유 진입점).
+
+    세미콜론 기준 문장 단위 평가 + 규칙명 dedup. {"violations":[...], "checked_rules":[...]}.
+    """
     s = _strip_comments(sql or "")
     violations: list[dict] = []
     seen: set[str] = set()
@@ -66,17 +69,6 @@ def evaluate_sql_rules(sql: str) -> dict:
                 seen.add(viol["rule"])
                 violations.append(viol)
     return {"violations": violations, "checked_rules": CHECKED_RULES}
-
-
-# Lambda 핸들러 등 외부에서 임포트할 수 있도록 공개 별칭 제공.
-# @tool 래퍼와 Lambda 핸들러 양쪽이 동일한 순수 함수를 호출한다.
-def check_rules_core(sql: str) -> dict:
-    """규칙 기반 SQL 정적 분석 순수 함수 (Lambda/직접 호출 공유 진입점).
-
-    evaluate_sql_rules 와 동일한 결과를 반환한다.
-    반환 형식: {"violations": [...], "checked_rules": [...]}
-    """
-    return evaluate_sql_rules(sql)
 
 
 @tool
