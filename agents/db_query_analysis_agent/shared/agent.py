@@ -11,9 +11,11 @@ from strands.handlers.callback_handler import null_callback_handler
 from strands.types.content import SystemContentBlock
 
 from agents.db_query_analysis_agent.shared.model import build_bedrock_model
-from agents.db_query_analysis_agent.tools.analyze_sql_with_llm import analyze_sql_with_llm
-from agents.db_query_analysis_agent.tools.check_sql_rules import check_sql_rules
-from agents.db_query_analysis_agent.tools.get_table_meta import get_table_meta
+from agents.db_query_analysis_agent.tools.strands_tools import (
+    analyze_sql_with_llm,
+    check_sql_rules,
+    get_table_meta,
+)
 from shared.config import demo_user
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"

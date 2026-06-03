@@ -1,13 +1,13 @@
-"""MySQL/SQL 쿼리 규칙 기반 정적 분석 (순수 함수 + @tool).
+"""MySQL/SQL 쿼리 규칙 기반 정적 분석 (순수 함수, strands-free).
 
 탐지: DELETE/UPDATE without WHERE, DROP, TRUNCATE, SELECT *, LIKE 선행 와일드카드.
 주석(-- , /* */)과 문자열 리터럴을 키워드 탐지 전에 제거해 오탐 최소화하고,
 세미콜론 기준 문장 단위로 평가해 다중 문장에서의 WHERE 누락 오탐을 방지한다.
 1차 리뷰용 경량 정규식.
+
+@tool 래퍼는 agents/db_query_analysis_agent/tools/strands_tools.py 에 있음.
 """
 import re
-
-from strands import tool
 
 _COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.DOTALL)
 _COMMENT_LINE = re.compile(r"--[^\n]*")
@@ -71,11 +71,3 @@ def check_rules_core(sql: str) -> dict:
     return {"violations": violations, "checked_rules": CHECKED_RULES}
 
 
-@tool
-def check_sql_rules(sql: str) -> dict:
-    """MySQL/SQL 쿼리의 규칙 기반 정적 분석.
-
-    DELETE/UPDATE without WHERE, DROP, TRUNCATE, SELECT *, LIKE 선행 와일드카드 탐지.
-    필수 파라미터: sql (str) — 반드시 "sql" 키 사용. "query" 금지.
-    """
-    return check_rules_core(sql)
