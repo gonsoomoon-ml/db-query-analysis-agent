@@ -19,7 +19,9 @@ pythonpath = ["."]
 addopts = "-q"
 
 [tool.ruff]
-exclude = ["infra/"]
+# Lambda 디렉터리는 핸들러 + (배포 시 transient) 벤더링 복사본이 섞여 있어 제외.
+# setup_gateway.py·cleanup_gateway.py 등 orchestration 코드는 정상 lint.
+exclude = ["infra/cognito-gateway/lambda"]
 
 [tool.uv]
 package = false
