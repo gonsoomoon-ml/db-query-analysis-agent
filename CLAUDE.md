@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Language / 응답
+
+When responding to the user (here, in the terminal), write in **Korean**. (Code identifiers, file paths, and git commit messages stay English.)
+
 ## Base code
 
 This project is based on the workshop repository:
