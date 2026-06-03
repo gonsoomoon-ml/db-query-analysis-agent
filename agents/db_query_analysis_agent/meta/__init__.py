@@ -1,4 +1,4 @@
-"""메타 backend 분기 — META_BACKEND(mock|redis). 두 backend 응답 shape 동형."""
+"""메타 backend 분기 — META_BACKEND(mock|sqlite|redis). 응답 shape 동형."""
 import os
 
 

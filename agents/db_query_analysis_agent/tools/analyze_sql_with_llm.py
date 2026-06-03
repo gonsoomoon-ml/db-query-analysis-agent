@@ -56,7 +56,7 @@ def run_explain(sql: str) -> str | None:
             rows = con.execute("EXPLAIN QUERY PLAN " + sql).fetchall()
         finally:
             con.close()
-    except sqlite3.Error:
+    except (sqlite3.Error, OSError):
         return None
     # rows: (id, parent, notused, detail)
     details = [r[3] for r in rows if len(r) >= 4 and r[3]]
