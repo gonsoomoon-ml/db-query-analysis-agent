@@ -50,6 +50,16 @@ DEMO_USER="$DEMO_USER" AWS_REGION="$REGION" \
     uv run python "$PROJECT_ROOT/infra/cognito-gateway/cleanup_gateway.py" \
     || warn "cleanup_gateway.py 실패 (무시 후 진행)"
 
+# ── 1b. OAuth2 credential provider 삭제 ──────────
+# deploy_runtime.py 가 생성. Cognito(issuer/clientId/secret)를 박아두므로 Cognito 재생성 시
+# stale 가 됨 — deploy_runtime 은 존재 시 idempotent skip 하여 옛 Cognito 를 가리킨 채 남는다.
+# 따라서 Cognito teardown 시 함께 제거(미존재해도 안전).
+OAUTH_PROVIDER_NAME="dbq-${DEMO_USER}-oauth"
+log "OAuth2 provider 삭제: $OAUTH_PROVIDER_NAME"
+aws bedrock-agentcore-control delete-oauth2-credential-provider \
+    --name "$OAUTH_PROVIDER_NAME" --region "$REGION" 2>/dev/null \
+    && log "  provider 삭제됨" || warn "  (provider 미존재/이미 삭제 — skip)"
+
 # ── 2. CFN stack 삭제 ─────────────────────────────
 log "CFN stack 삭제: $STACK"
 delete_stack "$STACK"
@@ -69,15 +79,12 @@ if aws s3api head-bucket --bucket "$DEPLOY_BUCKET" --region "$REGION" 2>/dev/nul
     aws s3 rb "s3://$DEPLOY_BUCKET" --region "$REGION"
 fi
 
-# ── 4. 벤더링 빌드 아티팩트 정리 ─────────────────
+# ── 4. 벤더링 빌드 아티팩트 정리 (handler.py 만 남기고 전부 제거) ──
+# agents/·data/ 벤더링 + analyze 의 pip 패키지(pydantic/strands/… ~40개) + __pycache__ 모두 청소.
+# 패키지별 열거(누락 발생)를 폐기하고 "handler.py 제외 전부" — deploy.sh 가 재생성하므로 안전.
 for TOOL in check_sql_rules get_table_meta analyze_sql_with_llm; do
-    rm -rf "$PROJECT_ROOT/infra/cognito-gateway/lambda/${TOOL}/agents"
-    rm -rf "$PROJECT_ROOT/infra/cognito-gateway/lambda/${TOOL}/data"
-    # strands pip-installed packages (analyze only, but safe to run for all)
-    find "$PROJECT_ROOT/infra/cognito-gateway/lambda/${TOOL}" \
-        -maxdepth 1 -name '*.dist-info' -type d -exec rm -rf {} + 2>/dev/null || true
-    find "$PROJECT_ROOT/infra/cognito-gateway/lambda/${TOOL}" \
-        -maxdepth 1 -name '*.dist-link' -type f -delete 2>/dev/null || true
+    TOOL_DIR="$PROJECT_ROOT/infra/cognito-gateway/lambda/${TOOL}"
+    find "$TOOL_DIR" -mindepth 1 -maxdepth 1 ! -name handler.py -exec rm -rf {} + 2>/dev/null || true
 done
 rm -f "$PROJECT_ROOT/infra/cognito-gateway/cognito.packaged.yaml"
 

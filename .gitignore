@@ -14,20 +14,9 @@ agents/db_query_analysis_agent/runtime/Dockerfile
 agents/db_query_analysis_agent/runtime/.dockerignore
 agents/db_query_analysis_agent/runtime/.bedrock_agentcore.yaml
 
-# Stage B Lambda vendored copies (build artifacts — deploy.sh 가 생성, commit 금지)
-infra/cognito-gateway/lambda/*/agents/
-infra/cognito-gateway/lambda/*/data/
-infra/cognito-gateway/lambda/*/*.dist-info/
-infra/cognito-gateway/lambda/*/*.dist-link
-infra/cognito-gateway/lambda/analyze_sql_with_llm/strands*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/strands_agents*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/boto*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/botocore*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/s3transfer*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/urllib3*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/certifi*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/charset_normalizer*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/jmespath*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/dateutil*/
-infra/cognito-gateway/lambda/analyze_sql_with_llm/python_dateutil*/
+# Stage B Lambda 빌드 산출물 — handler.py 만 추적, 나머지(벤더링 agents/data + pip 설치물 전체)는 무시.
+# deploy.sh 가 생성, teardown.sh 가 정리. 패키지별 열거(취약·누락 발생)를 폐기하고 전체 무시 +
+# handler.py 예외(견고) 패턴으로 대체 — strands-agents 의 ~40개 전이 의존성을 모두 커버.
+infra/cognito-gateway/lambda/*/*
+!infra/cognito-gateway/lambda/*/handler.py
 infra/cognito-gateway/cognito.packaged.yaml
