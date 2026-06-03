@@ -71,8 +71,10 @@ def build_db_query_agent() -> Agent:
 def agent_session(system_prompt_filename: str | None = None, token: str | None = None):
     """TOOLS_SOURCE 스위치: inprocess(기본)=in-process @tool 에이전트, gateway=Gateway MCP 도구 에이전트.
 
-    gateway 분기는 invoke마다 1회·stateless (MCP 세션을 with로 열고 그 안에서 에이전트 사용).
-    gateway 관련 import는 lazy — inprocess 모드에서는 gateway.py 의존성/env 불필요.
+    gateway 분기: __enter__마다 MCP 세션 open + list_tools + 새 에이전트 생성. MCP는 with 블록
+    수명 동안 유지되므로 warm/stateless는 호출자가 블록을 얼마나 오래 여느냐로 결정된다
+    (Runtime은 세션당 1회 열어 재사용 = warm; local run은 단발). gateway 관련 import는 lazy —
+    inprocess 모드에서는 gateway.py 의존성/env 불필요.
 
     Args:
         system_prompt_filename: 시스템 프롬프트 파일명 (기본: system_prompt.md).

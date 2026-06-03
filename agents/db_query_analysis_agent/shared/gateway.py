@@ -1,15 +1,15 @@
 """Gateway helper — Cognito Bearer 토큰 획득 + MCP client 팩토리.
 
-auth_local.py (base reference) 패턴 적용:
-  ``get_gateway_token`` → env 기반 자동 dispatch (provider vs direct)
-  ``create_mcp_client``  → token 헤더 주입 → Strands MCPClient 반환.
+  ``get_gateway_token`` → Cognito token endpoint 직접 호출 (client_credentials, urllib Basic auth)
+  ``create_mcp_client`` → token을 Authorization Bearer 헤더로 주입 → Strands MCPClient 반환.
 
-## 2-mode dispatch
+## 토큰 획득 경로 (단일)
 
-| 조건 | 경로 |
-|---|---|
-| ``OAUTH_PROVIDER_NAME`` 설정 | AgentCore Identity 경유 — boto3 ``get_resource_oauth2_token`` |
-| ``OAUTH_PROVIDER_NAME`` 미설정 | Cognito token endpoint 직접 호출 — urllib Basic auth |
+standalone(로컬/표준 MCP 클라이언트 검증)은 항상 direct(client_credentials)로 JWT를 얻는다.
+AgentCore Runtime(컨테이너)은 이 헬퍼가 아니라 ``@requires_access_token`` 데코레이터로 토큰을 얻는다
+— provider 경로(``get_resource_oauth2_token``)는 workloadIdentityToken(컨테이너 컨텍스트)이 필요해
+standalone에선 쓸 수 없기 때문. 따라서 ``get_gateway_token``은 ``OAUTH_PROVIDER_NAME`` 설정 여부와
+무관하게 항상 direct.
 """
 import base64
 import json

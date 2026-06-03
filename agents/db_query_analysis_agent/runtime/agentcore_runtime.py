@@ -82,6 +82,9 @@ async def _get_or_create_gateway_agent(session_id: str):
     token = await _fetch_gateway_token()
     cm = agent_session(token=token)   # gateway 분기: MCP open + list_tools + create_agent
     agent = cm.__enter__()            # yield까지 실행 → agent (MCP는 열린 채 유지)
+    # cm을 함께 보관하는 이유 = GC 방지. agent_session은 `with create_mcp_client(...)` 블록 안에서
+    # yield하므로, cm 참조를 놓으면 generator가 GC될 때 GeneratorExit로 그 with가 __exit__ →
+    # MCP 세션이 끊겨 warm 재사용이 깨진다. 따라서 microVM 수명 동안 cm 참조를 살려둔다.
     _gateway_sessions[session_id] = (agent, cm)
     return agent
 

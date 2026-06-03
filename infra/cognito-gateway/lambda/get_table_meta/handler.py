@@ -1,11 +1,10 @@
 """get-table-meta Lambda — AgentCore Gateway 타겟 (strands-free 경량).
 
-패키징: get_table_meta 코어는 strands 의존 없음 → Lambda 레이어 없이 배포 가능.
-배포/패키징은 별도 태스크에서 처리.
+패키징: get_table_meta 코어는 strands 의존 없음 → deploy.sh 가 `tools meta` 서브패키지 벤더링.
 
 AgentCore Gateway 호출 패턴:
-- tool 식별자: context.client_context.custom["bedrockAgentCoreToolName"]
-- input: event 자체가 inputSchema.properties 의 값 dict
+- 1 tool / Lambda (target 1:1 매핑) — 단일 tool 이라 bedrockAgentCoreToolName 디스패치 불필요.
+- input: event 자체가 inputSchema.properties 의 값 dict (wrapper 없음).
 """
 from agents.db_query_analysis_agent.tools.get_table_meta import table_meta_core
 
