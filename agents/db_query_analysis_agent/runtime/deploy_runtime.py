@@ -40,11 +40,8 @@ def copy_into_build_context() -> None:
     print(f"{GREEN}✅ build context 복사{NC}")
 
 
-def main() -> None:
-    print(f"{YELLOW}[1/5] build context 복사{NC}")
-    copy_into_build_context()
-
-    print(f"{YELLOW}[2/5] Runtime configure{NC}")
+def configure_runtime():
+    """toolkit Runtime configure — Dockerfile/ECR/실행 role 자동 생성. 구성된 Runtime 반환."""
     from bedrock_agentcore_starter_toolkit import Runtime
     rt = Runtime()
     rt.configure(
@@ -56,9 +53,12 @@ def main() -> None:
         region=REGION,
         non_interactive=True,
     )
+    return rt
 
-    print(f"{YELLOW}[3/5] launch (Docker→ECR→Runtime, ~5-10분){NC}")
-    env_vars = {
+
+def _runtime_env_vars() -> dict:
+    """컨테이너에 주입할 환경변수 (모두 기본값 폴백)."""
+    return {
         "AWS_REGION": REGION,
         "DEMO_USER": DEMO_USER,
         "META_BACKEND": os.environ.get("META_BACKEND", "mock"),
@@ -70,13 +70,19 @@ def main() -> None:
         "ANALYZE_MAX_TOKENS": os.environ.get("ANALYZE_MAX_TOKENS", "2048"),
         "LARGE_TABLE_THRESHOLD": os.environ.get("LARGE_TABLE_THRESHOLD", "1000000"),
     }
-    result = rt.launch(env_vars=env_vars, auto_update_on_conflict=True)
-    print(f"{GREEN}✅ launch: {result.agent_arn}{NC}")
 
-    print(f"{YELLOW}[4/5] 실행 role에 bedrock:InvokeModel 부착{NC}")
+
+def launch_runtime(rt):
+    """Docker→ECR→Runtime launch (충돌 시 갱신). launch 결과 반환."""
+    result = rt.launch(env_vars=_runtime_env_vars(), auto_update_on_conflict=True)
+    print(f"{GREEN}✅ launch: {result.agent_arn}{NC}")
+    return result
+
+
+def attach_bedrock_policy(agent_id: str) -> None:
+    """실행 role에 bedrock:InvokeModel 인라인 정책 부착."""
     ctrl = boto3.client("bedrock-agentcore-control", region_name=REGION)
-    info = ctrl.get_agent_runtime(agentRuntimeId=result.agent_id)
-    role_name = info["roleArn"].split("/")[-1]
+    role_name = ctrl.get_agent_runtime(agentRuntimeId=agent_id)["roleArn"].split("/")[-1]
     boto3.client("iam").put_role_policy(
         RoleName=role_name,
         PolicyName="BedrockInvoke",
@@ -91,23 +97,49 @@ def main() -> None:
     )
     print(f"{GREEN}✅ IAM: {role_name}/BedrockInvoke{NC}")
 
-    print(f"{YELLOW}[5/5] READY 대기{NC}")
+
+def wait_until_ready(agent_id: str) -> None:
+    """status가 READY가 될 때까지 폴링(최대 ~10분). READY 아니면 로그 힌트 출력 후 종료."""
+    ctrl = boto3.client("bedrock-agentcore-control", region_name=REGION)
     status = "CREATING"
     for i in range(60):
         time.sleep(10)
-        status = ctrl.get_agent_runtime(agentRuntimeId=result.agent_id)["status"]
+        status = ctrl.get_agent_runtime(agentRuntimeId=agent_id)["status"]
         print(f"   [{i+1}/60] {status}")
         if status in ("READY", "CREATE_FAILED", "UPDATE_FAILED"):
             break
     if status != "READY":
-        print(f"{RED}❌ 실패: {status} — aws logs tail /aws/bedrock-agentcore/runtimes/{AGENT_NAME} --region {REGION}{NC}")
+        log_grp = f"/aws/bedrock-agentcore/runtimes/{agent_id}-DEFAULT"
+        print(f"{RED}❌ 실패: {status} — aws logs tail {log_grp} --region {REGION}{NC}")
         sys.exit(1)
 
+
+def save_runtime_env(result) -> None:
+    """RUNTIME_NAME/ID/ARN 을 repo root .env 에 저장(기존 값 교체)."""
     env_file = PROJECT_ROOT / ".env"
     keep = [ln for ln in (env_file.read_text().splitlines() if env_file.exists() else [])
             if not ln.startswith(("RUNTIME_ARN=", "RUNTIME_ID=", "RUNTIME_NAME="))]
     keep += [f"RUNTIME_NAME={AGENT_NAME}", f"RUNTIME_ID={result.agent_id}", f"RUNTIME_ARN={result.agent_arn}"]
     env_file.write_text("\n".join(keep) + "\n")
+
+
+def main() -> None:
+    print(f"{YELLOW}[1/5] build context 복사{NC}")
+    copy_into_build_context()
+
+    print(f"{YELLOW}[2/5] Runtime configure{NC}")
+    rt = configure_runtime()
+
+    print(f"{YELLOW}[3/5] launch (Docker→ECR→Runtime, 수 분){NC}")
+    result = launch_runtime(rt)
+
+    print(f"{YELLOW}[4/5] 실행 role에 bedrock:InvokeModel 부착{NC}")
+    attach_bedrock_policy(result.agent_id)
+
+    print(f"{YELLOW}[5/5] READY 대기{NC}")
+    wait_until_ready(result.agent_id)
+
+    save_runtime_env(result)
     print(f"{GREEN}✅ 배포 완료 — RUNTIME_ARN .env 저장 ({datetime.now():%H:%M}){NC}")
     print("   다음: uv run python -m agents.db_query_analysis_agent.runtime.invoke_runtime --query \"SELECT * FROM orders WHERE user_id=1\"")
 
