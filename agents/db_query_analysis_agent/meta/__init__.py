@@ -8,8 +8,11 @@ def current_backend() -> str:
 
 def lookup_table_meta(table_name: str) -> dict | None:
     """현재 backend에서 테이블 메타 조회. 미존재 시 None."""
-    if current_backend() == "redis":
+    backend = current_backend()
+    if backend == "redis":
         from .redis_backend import lookup
+    elif backend == "sqlite":
+        from .sqlite_backend import lookup
     else:
         from .mock_backend import lookup
     return lookup(table_name)
