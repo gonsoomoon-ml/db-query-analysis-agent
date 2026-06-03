@@ -68,11 +68,17 @@ def build_db_query_agent() -> Agent:
 
 
 @contextlib.contextmanager
-def agent_session(system_prompt_filename: str | None = None):
+def agent_session(system_prompt_filename: str | None = None, token: str | None = None):
     """TOOLS_SOURCE 스위치: inprocess(기본)=in-process @tool 에이전트, gateway=Gateway MCP 도구 에이전트.
 
     gateway 분기는 invoke마다 1회·stateless (MCP 세션을 with로 열고 그 안에서 에이전트 사용).
     gateway 관련 import는 lazy — inprocess 모드에서는 gateway.py 의존성/env 불필요.
+
+    Args:
+        system_prompt_filename: 시스템 프롬프트 파일명 (기본: system_prompt.md).
+        token: gateway 분기에서 사용할 Cognito Bearer 토큰. None이면 내부에서 get_gateway_token()으로
+               자동 획득 (로컬 호출용). AgentCore Runtime은 @requires_access_token 데코레이터가
+               획득한 토큰을 이 인자로 전달해 workload identity 컨텍스트를 보존.
     """
     src = os.environ.get("TOOLS_SOURCE", "inprocess")
     if src == "gateway":
@@ -80,7 +86,8 @@ def agent_session(system_prompt_filename: str | None = None):
             create_mcp_client,
             get_gateway_token,
         )
-        with create_mcp_client(get_gateway_token()) as mcp:
+        tok = token or get_gateway_token()
+        with create_mcp_client(tok) as mcp:
             tools = mcp.list_tools_sync()
             yield create_agent(
                 tools=tools,

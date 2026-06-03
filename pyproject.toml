@@ -18,5 +18,8 @@ dev = ["pytest>=8.0.0", "ruff>=0.7.0", "bedrock-agentcore-starter-toolkit>=0.1.1
 pythonpath = ["."]
 addopts = "-q"
 
+[tool.ruff]
+exclude = ["infra/"]
+
 [tool.uv]
 package = false

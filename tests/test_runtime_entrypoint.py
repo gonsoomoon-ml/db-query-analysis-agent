@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from agents.db_query_analysis_agent.runtime import agentcore_runtime as rt
 
 
@@ -74,3 +75,50 @@ def test_entrypoint_session_id_fallbacks(monkeypatch):
     assert seen["sid"] == "payload-session"
     _collect(rt.review({"query": "SELECT 1"}, context=None))
     assert seen["sid"] == "default"
+
+
+# ---------------------------------------------------------------------------
+# gateway 분기 테스트
+# ---------------------------------------------------------------------------
+
+def test_review_gateway_mode(monkeypatch):
+    """TOOLS_SOURCE=gateway 시:
+    - _fetch_gateway_token()으로 토큰 획득
+    - agent_session(token=tok) contextmanager 경유 (stateless, per-invoke)
+    - _get_or_create_agent는 호출되지 않음
+    """
+    monkeypatch.setenv("TOOLS_SOURCE", "gateway")
+
+    # _fetch_gateway_token async stub — "tok" 반환
+    async def _fake_fetch_gateway_token():
+        return "tok"
+
+    monkeypatch.setattr(rt, "_fetch_gateway_token", _fake_fetch_gateway_token)
+
+    # _get_or_create_agent가 호출되면 fail
+    def _must_not_call(session_id):
+        raise AssertionError("_get_or_create_agent must NOT be called in gateway mode")
+
+    monkeypatch.setattr(rt, "_get_or_create_agent", _must_not_call)
+
+    # agent_session contextmanager stub — token kwarg 검증 후 _FakeAgent yield
+    captured_token = {}
+
+    @contextlib.contextmanager
+    def _fake_agent_session(system_prompt_filename=None, token=None):
+        captured_token["token"] = token
+        yield _FakeAgent()
+
+    monkeypatch.setattr(rt, "agent_session", _fake_agent_session)
+
+    events = _collect(rt.review({"query": "SELECT 1"}))
+
+    # SSE 이벤트 검증
+    types = [e["type"] for e in events]
+    assert "agent_text_stream" in types
+    assert types[-1] == "workflow_complete"
+    text = "".join(e.get("text", "") for e in events if e["type"] == "agent_text_stream")
+    assert text == "리뷰"
+
+    # 토큰이 agent_session에 전달됐는지 검증
+    assert captured_token["token"] == "tok"
