@@ -223,6 +223,32 @@ bash infra/cognito-gateway/teardown.sh
 - `TOOLS_SOURCE=inprocess`(기본)로 두면 Cognito/Gateway 없이 오프라인 동작(§2) — 회귀 확인용.
 - analyze Lambda 는 `DB_PATH=/tmp` 로 EXPLAIN용 `sample.db` 를 빌드(읽기전용 `/var/task` 우회). 실패해도 graceful(분석은 정상).
 
+**게이트웨이 chat (멀티턴)** — 두 경로가 있고 warm 동작이 다릅니다:
+
+```bash
+# (A) 로컬 gateway chat — 한 세션에서 agent 재사용 → warm 멀티턴 + Gateway 경유 도구
+TOOLS_SOURCE=gateway uv run python -m agents.db_query_analysis_agent.local.chat
+# (B) 배포된 Runtime 의 gateway 모드 chat (SigV4 호출, 도구는 Gateway 경유)
+uv run python -m agents.db_query_analysis_agent.runtime.chat
+```
+
+(A) 로컬 — 각 입력은 빈 줄(Enter)로 전송, `/reset` 새 세션, `/quit` 종료. 한 세션에서 agent가 유지돼 맥락이 누적됩니다:
+
+```text
+> SELECT * FROM orders WHERE user_id = 1
+  → (턴1) Gateway→Lambda 도구로 전체 리뷰
+
+> 방금 쿼리에서 가장 큰 문제 하나만 한 줄로
+  → (턴2) "방금 쿼리" = 턴1 맥락 (로컬은 agent 재사용 → warm)
+
+> 그걸 고친 SQL과 추천 인덱스를 같이 제안해줘
+  → (턴3) 턴1·2 누적 맥락
+
+> /quit
+```
+
+⚠️ **warm 차이(중요)**: (A) 로컬 chat은 한 `agent_session` 안에서 agent를 재사용해 **맥락이 이어집니다**. 그러나 (B) **배포된 Runtime의 gateway 모드는 invoke당 stateless**(§9 설계 — 매 호출 새 agent를 Gateway로 구성)라 `runtime.chat`의 각 턴은 **독립**입니다("방금 그 쿼리"가 안 통함 → 각 턴이 별도 리뷰). 원격에서 warm 멀티턴이 필요하면 `TOOLS_SOURCE=inprocess`(기본, §3) 모드를 쓰세요.
+
 ## 참고: 토큰 캐시 (Cache R/W 0/0)
 
 단발/짧은 프롬프트에서는 토큰 usage의 `Cache R/W: 0/0`이 정상입니다. 캐시 가능한
