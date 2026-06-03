@@ -45,3 +45,32 @@ def test_entrypoint_missing_query():
     events = _collect(rt.review({}))
     assert events[0]["type"] == "agent_text_stream" and "query" in events[0]["text"]
     assert events[-1]["type"] == "workflow_complete"
+
+
+def test_entrypoint_prefers_context_session_id(monkeypatch):
+    """C1: 세션 키는 context.session_id(AgentCore 헤더) 우선 — payload보다 앞선다."""
+    seen = {}
+
+    class _Ctx:
+        session_id = "ctx-session"
+
+    def fake_get(session_id):
+        seen["sid"] = session_id
+        return _FakeAgent()
+    monkeypatch.setattr(rt, "_get_or_create_agent", fake_get)
+    _collect(rt.review({"query": "SELECT 1", "session_id": "payload-session"}, context=_Ctx()))
+    assert seen["sid"] == "ctx-session"
+
+
+def test_entrypoint_session_id_fallbacks(monkeypatch):
+    """context 없으면 payload.session_id, 그것도 없으면 'default'."""
+    seen = {}
+
+    def fake_get(session_id):
+        seen["sid"] = session_id
+        return _FakeAgent()
+    monkeypatch.setattr(rt, "_get_or_create_agent", fake_get)
+    _collect(rt.review({"query": "SELECT 1", "session_id": "payload-session"}, context=None))
+    assert seen["sid"] == "payload-session"
+    _collect(rt.review({"query": "SELECT 1"}, context=None))
+    assert seen["sid"] == "default"

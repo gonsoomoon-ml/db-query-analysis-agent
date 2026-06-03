@@ -15,13 +15,13 @@ for _root in (_SCRIPT_DIR, *_SCRIPT_DIR.parents):
         if str(_root) not in sys.path:
             sys.path.insert(0, str(_root))
         break
+else:  # 루트 미발견 → build context 누락. 모호한 ImportError 대신 원인을 명시.
+    raise RuntimeError(f"agents/·shared/ 를 가진 루트를 찾지 못함 (build context 누락?): {_SCRIPT_DIR}")
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 
-try:
-    from agents.db_query_analysis_agent.shared.agent import build_db_query_agent  # noqa: E402
-except ModuleNotFoundError:  # 컨테이너 flatten 폴백
-    from shared.agent import build_db_query_agent  # type: ignore # noqa: E402
+# 위 부트스트랩이 agents/·shared/ 루트를 sys.path에 넣으므로 컨테이너(/app)·로컬 모두 이 import로 충분.
+from agents.db_query_analysis_agent.shared.agent import build_db_query_agent  # noqa: E402
 
 app = BedrockAgentCoreApp()
 _session_agents: dict[str, Any] = {}
@@ -60,7 +60,13 @@ async def review(payload: dict, context: Any = None) -> AsyncGenerator[dict, Non
         yield {"type": "agent_text_stream", "text": '[error] payload에 "query" 누락'}
         yield {"type": "workflow_complete", "text": ""}
         return
-    session_id = (payload or {}).get("session_id") or "default"
+    # 세션 키: AgentCore runtimeSessionId(context, 헤더) 우선 → payload → "default".
+    # 헤더 기반이라 표준 호출(payload에 session_id 미포함)에서도 멀티턴 세션이 격리된다.
+    session_id = (
+        getattr(context, "session_id", None)
+        or (payload or {}).get("session_id")
+        or "default"
+    )
     agent = _get_or_create_agent(session_id)
     async for ev in _stream_review(agent, query):
         yield ev
