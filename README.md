@@ -7,8 +7,20 @@ MySQL/SQL 쿼리 1차 리뷰 에이전트 (Strands Agents + AWS Bedrock) — 규
 ## 로드맵
 
 `Stage 1`(로컬 단일 에이전트 + plain tool 3종) → `Phase 1` SQLite 백엔드 → `Phase 2`
-AgentCore Runtime → **(다음)** Redis 캐시 → Cognito/Gateway → A2A/Supervisor.
-**Stage 1 · Phase 1 · Phase 2 완료** (모두 `main`).
+AgentCore Runtime → `Phase 3` Cognito/Gateway → **(다음)** Redis 캐시 → A2A/Supervisor.
+**Stage 1 · Phase 1 · Phase 2 · Phase 3 완료** (모두 `main`).
+
+### TOOLS_SOURCE 전환
+
+로컬·Runtime 어디서나 `TOOLS_SOURCE` 환경변수로 도구 공급원을 전환합니다.
+
+| 값 | 설명 |
+|---|---|
+| `inprocess` (기본) | 오프라인 in-process @tool 에이전트 — Cognito/Gateway 불필요 |
+| `gateway` | Cognito-보안 Gateway MCP 도구 에이전트 |
+
+인프라 배포: `infra/cognito-gateway/deploy.sh` (실행 후 `.env`의 Cognito/Gateway 변수가 자동 채워짐).
+설계 상세: `design/2026-06-03-phase3-cognito-gateway-spec.md`.
 
 ## 빠른 시작 (로컬)
 

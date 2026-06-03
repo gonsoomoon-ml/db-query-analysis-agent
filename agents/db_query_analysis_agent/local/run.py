@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agents.db_query_analysis_agent.shared.agent import build_db_query_agent
+from agents.db_query_analysis_agent.shared.agent import agent_session
 from shared.streaming import stream_response
 
 CYAN = "\033[0;36m"
@@ -13,8 +13,8 @@ NC = "\033[0m"
 
 
 async def _amain(sql: str) -> None:
-    agent = build_db_query_agent()
-    await stream_response(agent, f"다음 SQL을 리뷰해줘:\n```sql\n{sql}\n```")
+    with agent_session() as agent:
+        await stream_response(agent, f"다음 SQL을 리뷰해줘:\n```sql\n{sql}\n```")
 
 
 def main() -> None:
