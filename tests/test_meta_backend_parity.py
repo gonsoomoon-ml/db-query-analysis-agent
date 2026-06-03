@@ -1,4 +1,3 @@
-import os
 import pytest
 from agents.db_query_analysis_agent.meta import lookup_table_meta, current_backend
 

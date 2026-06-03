@@ -57,3 +57,11 @@ def test_return_shape():
     out = evaluate_sql_rules("DROP TABLE x")
     assert "violations" in out and "checked_rules" in out
     assert out["violations"][0]["severity"] == "critical"
+
+
+def test_multistatement_delete_not_suppressed_by_later_where():
+    assert "DELETE_WITHOUT_WHERE" in rules("DELETE FROM a; SELECT * FROM b WHERE id = 1")
+
+
+def test_where_inside_string_literal_not_counted():
+    assert "UPDATE_WITHOUT_WHERE" in rules("UPDATE t SET note = 'set WHERE later'")
