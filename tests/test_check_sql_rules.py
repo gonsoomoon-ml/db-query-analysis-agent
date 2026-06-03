@@ -1,8 +1,8 @@
-from agents.db_query_analysis_agent.tools.check_sql_rules import evaluate_sql_rules
+from agents.db_query_analysis_agent.tools.check_sql_rules import check_rules_core
 
 
 def rules(sql: str) -> set[str]:
-    return {v["rule"] for v in evaluate_sql_rules(sql)["violations"]}
+    return {v["rule"] for v in check_rules_core(sql)["violations"]}
 
 
 def test_delete_without_where():
@@ -54,7 +54,8 @@ def test_clean_select_no_violations():
 
 
 def test_return_shape():
-    out = evaluate_sql_rules("DROP TABLE x")
+    # check_rules_core: @tool 래퍼와 Lambda 핸들러가 공유하는 순수 코어
+    out = check_rules_core("DROP TABLE x")
     assert "violations" in out and "checked_rules" in out
     assert out["violations"][0]["severity"] == "critical"
 

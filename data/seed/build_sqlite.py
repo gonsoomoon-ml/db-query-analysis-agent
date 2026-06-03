@@ -4,13 +4,15 @@ sample.db = 테이블 + 인덱스 + table_stats(행수). sqlite backend / EXPLAI
 
 사용: uv run python -m data.seed.build_sqlite
 """
+import os
 import sqlite3
 from pathlib import Path
 
 from data.mock.table_meta import TABLE_META
 
 _DATA_DIR = Path(__file__).resolve().parents[1]
-DB_PATH = _DATA_DIR / "sample.db"
+# DB_PATH env로 재정의 가능 — Lambda(/var/task 읽기전용)에선 /tmp 경로를 주입해 EXPLAIN parity 유지.
+DB_PATH = Path(os.environ.get("DB_PATH") or (_DATA_DIR / "sample.db"))
 
 
 def _pk_columns(table: str, meta: dict) -> list[str]:

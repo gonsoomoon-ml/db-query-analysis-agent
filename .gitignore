@@ -13,3 +13,21 @@ agents/db_query_analysis_agent/runtime/data/
 agents/db_query_analysis_agent/runtime/Dockerfile
 agents/db_query_analysis_agent/runtime/.dockerignore
 agents/db_query_analysis_agent/runtime/.bedrock_agentcore.yaml
+
+# Stage B Lambda vendored copies (build artifacts — deploy.sh 가 생성, commit 금지)
+infra/cognito-gateway/lambda/*/agents/
+infra/cognito-gateway/lambda/*/data/
+infra/cognito-gateway/lambda/*/*.dist-info/
+infra/cognito-gateway/lambda/*/*.dist-link
+infra/cognito-gateway/lambda/analyze_sql_with_llm/strands*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/strands_agents*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/boto*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/botocore*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/s3transfer*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/urllib3*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/certifi*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/charset_normalizer*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/jmespath*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/dateutil*/
+infra/cognito-gateway/lambda/analyze_sql_with_llm/python_dateutil*/
+infra/cognito-gateway/cognito.packaged.yaml

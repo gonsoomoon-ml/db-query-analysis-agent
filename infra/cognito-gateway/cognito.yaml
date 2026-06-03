@@ -1,0 +1,218 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  DB Query Analysis Agent — Cognito + 3 Lambdas + IAM Roles + GatewayIamRole.
+  Standard AWS resources only. AgentCore Gateway/Target are created via
+  infra/cognito-gateway/setup_gateway.py (boto3, hybrid pattern).
+
+Parameters:
+  DemoUser:
+    Type: String
+    Description: Multi-user namespace prefix (matches .env DEMO_USER).
+    AllowedPattern: '^[a-zA-Z0-9-]{1,16}$'
+    MinLength: 1
+    MaxLength: 16
+
+Resources:
+
+  # === Cognito ========================================================
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'dbq-${DemoUser}-userpool'
+      MfaConfiguration: 'OFF'
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          RequireUppercase: false
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      # globally unique — AccountId suffix for per-account uniqueness
+      Domain: !Sub 'dbq-${DemoUser}-${AWS::AccountId}'
+
+  UserPoolResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Identifier: !Sub 'dbq-${DemoUser}-resource-server'
+      Name: 'DB Query Gateway Invoke'
+      Scopes:
+        - ScopeName: invoke
+          ScopeDescription: Invoke AgentCore Gateway tools
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolResourceServer
+    Properties:
+      ClientName: !Sub 'dbq-${DemoUser}-client'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: true
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - client_credentials
+      AllowedOAuthScopes:
+        - !Sub 'dbq-${DemoUser}-resource-server/invoke'
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+
+  # === Lambda — check_sql_rules (strands-free, lightweight) ===========
+
+  CheckSqlRulesLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dbq-${DemoUser}-check-sql-rules-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  CheckSqlRulesLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'dbq-${DemoUser}-check-sql-rules'
+      Runtime: python3.12
+      Handler: handler.handler
+      Code: ./lambda/check_sql_rules
+      Role: !GetAtt CheckSqlRulesLambdaRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          DEMO_USER: !Ref DemoUser
+
+  # === Lambda — get_table_meta (strands-free, lightweight) ============
+
+  GetTableMetaLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dbq-${DemoUser}-get-table-meta-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  GetTableMetaLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'dbq-${DemoUser}-get-table-meta'
+      Runtime: python3.12
+      Handler: handler.handler
+      Code: ./lambda/get_table_meta
+      Role: !GetAtt GetTableMetaLambdaRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          DEMO_USER: !Ref DemoUser
+          META_BACKEND: mock
+
+  # === Lambda — analyze_sql_with_llm (strands + Bedrock) ==============
+
+  AnalyzeSqlWithLlmLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dbq-${DemoUser}-analyze-sql-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: bedrock-invoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: '*'
+
+  AnalyzeSqlWithLlmLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'dbq-${DemoUser}-analyze-sql-with-llm'
+      Runtime: python3.12
+      Handler: handler.handler
+      Code: ./lambda/analyze_sql_with_llm
+      Role: !GetAtt AnalyzeSqlWithLlmLambdaRole.Arn
+      Timeout: 120
+      MemorySize: 512
+      Environment:
+        Variables:
+          DEMO_USER: !Ref DemoUser
+          # /var/task 는 읽기전용 → EXPLAIN용 sample.db 를 쓰기가능한 /tmp 에 빌드(inprocess와 parity).
+          DB_PATH: /tmp/dbq-sample.db
+
+  # === IAM — Gateway execution role ===================================
+
+  GatewayIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dbq-${DemoUser}-gateway-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-tool-lambdas
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt CheckSqlRulesLambda.Arn
+                  - !GetAtt GetTableMetaLambda.Arn
+                  - !GetAtt AnalyzeSqlWithLlmLambda.Arn
+
+Outputs:
+  UserPoolId:
+    Description: Cognito UserPool ID
+    Value: !Ref UserPool
+  Domain:
+    Description: Cognito UserPool Domain prefix
+    Value: !Ref UserPoolDomain
+  ClientId:
+    Description: Cognito UserPoolClient (M2M client_credentials)
+    Value: !Ref UserPoolClient
+  ResourceServerScope:
+    Description: OAuth2 scope for Gateway invoke (full name)
+    Value: !Sub 'dbq-${DemoUser}-resource-server/invoke'
+  LambdaCheckSqlRulesArn:
+    Description: check_sql_rules Lambda ARN
+    Value: !GetAtt CheckSqlRulesLambda.Arn
+  LambdaGetTableMetaArn:
+    Description: get_table_meta Lambda ARN
+    Value: !GetAtt GetTableMetaLambda.Arn
+  LambdaAnalyzeSqlWithLlmArn:
+    Description: analyze_sql_with_llm Lambda ARN
+    Value: !GetAtt AnalyzeSqlWithLlmLambda.Arn
+  GatewayIamRoleArn:
+    Description: IAM Role ARN for AgentCore Gateway (Lambda invoke only)
+    Value: !GetAtt GatewayIamRole.Arn

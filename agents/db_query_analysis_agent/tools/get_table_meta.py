@@ -1,12 +1,12 @@
-"""SQL에서 테이블명 추출 + 메타데이터 조회 (순수 함수 + @tool).
+"""SQL에서 테이블명 추출 + 메타데이터 조회 (순수 함수, strands-free).
 
 FROM/JOIN/INTO/UPDATE/TABLE 다음 식별자를 추출(별칭/백틱/스키마 접두 처리),
 META_BACKEND를 통해 메타 조회, large_table 플래그 부여.
+
+@tool 래퍼는 agents/db_query_analysis_agent/tools/strands_tools.py 에 있음.
 """
 import os
 import re
-
-from strands import tool
 
 from agents.db_query_analysis_agent.meta import current_backend, lookup_table_meta
 
@@ -44,8 +44,8 @@ def extract_table_names(sql: str) -> list[str]:
     return names
 
 
-def collect_table_meta(sql: str) -> dict:
-    """추출 테이블별 메타 + large_table 플래그. backend/threshold 동봉."""
+def table_meta_core(sql: str) -> dict:
+    """추출 테이블별 메타 + large_table 플래그(순수 함수 — @tool/Lambda 공유 진입점). backend/threshold 동봉."""
     threshold = int(os.environ.get("LARGE_TABLE_THRESHOLD", "1000000"))
     tables: list[dict] = []
     for name in extract_table_names(sql):
@@ -66,11 +66,3 @@ def collect_table_meta(sql: str) -> dict:
             "large_table_threshold": threshold}
 
 
-@tool
-def get_table_meta(sql: str) -> dict:
-    """SQL에서 테이블명을 추출하고 메타데이터(스키마/인덱스/행수)를 조회.
-
-    행수 > LARGE_TABLE_THRESHOLD 면 large_table=true. 미존재 테이블은 found=false.
-    필수 파라미터: sql (str) — 반드시 "sql" 키 사용. "table_name" 금지.
-    """
-    return collect_table_meta(sql)

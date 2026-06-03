@@ -7,8 +7,20 @@ MySQL/SQL 쿼리 1차 리뷰 에이전트 (Strands Agents + AWS Bedrock) — 규
 ## 로드맵
 
 `Stage 1`(로컬 단일 에이전트 + plain tool 3종) → `Phase 1` SQLite 백엔드 → `Phase 2`
-AgentCore Runtime → **(다음)** Redis 캐시 → Cognito/Gateway → A2A/Supervisor.
-**Stage 1 · Phase 1 · Phase 2 완료** (모두 `main`).
+AgentCore Runtime → `Phase 3` Cognito/Gateway → **(다음)** Redis 캐시 → A2A/Supervisor.
+**Stage 1 · Phase 1 · Phase 2 · Phase 3 완료** (모두 `main`).
+
+### TOOLS_SOURCE 전환
+
+로컬·Runtime 어디서나 `TOOLS_SOURCE` 환경변수로 도구 공급원을 전환합니다.
+
+| 값 | 설명 |
+|---|---|
+| `inprocess` (기본) | 오프라인 in-process @tool 에이전트 — Cognito/Gateway 불필요 |
+| `gateway` | Cognito-보안 Gateway MCP 도구 에이전트 |
+
+인프라 배포: `infra/cognito-gateway/deploy.sh` (실행 후 `.env`의 Cognito/Gateway 변수가 자동 채워짐).
+설계 상세: `design/2026-06-03-phase3-cognito-gateway-spec.md`.
 
 ## 빠른 시작 (로컬)
 
@@ -78,7 +90,7 @@ uv sync --extra dev          # pytest·ruff·agentcore 툴킷 포함
 ### 1. 단위 테스트 (오프라인 · 기본)
 
 ```bash
-uv run pytest                # 전체 — 70 passed, 1 skipped
+uv run pytest                # 전체 — 95 passed, 1 skipped
 uv run pytest -v             # 테스트별 상세
 uv run pytest tests/test_check_sql_rules.py        # 파일 단위
 uv run pytest -k "explain or sse"                  # 키워드 필터
@@ -102,8 +114,11 @@ uv run pytest -k "explain or sse"                  # 키워드 필터
 | 백엔드 패리티 (mock = sqlite = redis) | `test_meta_backend_parity` | 5 (redis 1 스킵) |
 | EXPLAIN QUERY PLAN (read-only) | `test_explain` | 4 |
 | LLM 심층 분석 도구 | `test_analyze_sql` | 5 |
-| Runtime 엔트리포인트 (세션 캐시·SSE) | `test_runtime_entrypoint` | 5 |
-| 원격 SSE 파싱 | `test_remote_sse` | 4 |
+| Lambda 핸들러 (Gateway 타깃) | `test_lambda_handlers` | 15 |
+| Gateway 헬퍼 (토큰/MCP) | `test_gateway_helper` | 4 |
+| TOOLS_SOURCE 스위치 | `test_agent_session` | 4 |
+| Runtime 엔트리포인트 (세션·SSE·gateway 분기) | `test_runtime_entrypoint` | 6 |
+| 원격 SSE 파싱 | `test_remote_sse` | 5 |
 | 멀티라인 입력 (REPL) | `test_repl` | 5 |
 | 메타 스키마·모델 헬퍼·스트리밍·facade·agent build | (5개 파일) | 9 |
 

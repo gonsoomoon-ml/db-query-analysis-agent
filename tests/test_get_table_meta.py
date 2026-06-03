@@ -1,6 +1,7 @@
 import pytest
 from agents.db_query_analysis_agent.tools.get_table_meta import (
-    extract_table_names, collect_table_meta,
+    extract_table_names,
+    table_meta_core,
 )
 
 
@@ -31,23 +32,24 @@ def test_extract_schema_qualified():
     assert extract_table_names("SELECT * FROM shop.orders") == ["orders"]
 
 
+# table_meta_core: @tool 래퍼와 Lambda 핸들러가 공유하는 순수 코어
 def test_large_table_flagged():
-    t = collect_table_meta("SELECT * FROM orders")["tables"][0]
+    t = table_meta_core("SELECT * FROM orders")["tables"][0]
     assert t["found"] is True and t["large_table"] is True
 
 
 def test_small_table_not_flagged():
-    t = collect_table_meta("SELECT id FROM users WHERE id = 1")["tables"][0]
+    t = table_meta_core("SELECT id FROM users WHERE id = 1")["tables"][0]
     assert t["found"] is True and t["large_table"] is False
 
 
 def test_unknown_table():
-    t = collect_table_meta("SELECT * FROM ghost")["tables"][0]
+    t = table_meta_core("SELECT * FROM ghost")["tables"][0]
     assert t == {"name": "ghost", "found": False}
 
 
 def test_backend_reported():
-    out = collect_table_meta("SELECT * FROM users")
+    out = table_meta_core("SELECT * FROM users")
     assert out["backend"] == "mock"
     assert out["large_table_threshold"] == 1_000_000
 
