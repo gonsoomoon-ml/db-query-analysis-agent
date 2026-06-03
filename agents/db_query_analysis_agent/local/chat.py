@@ -4,6 +4,7 @@
 전송 — 멀티라인 SQL 붙여넣기 지원. /reset 초기화, /quit 종료.
 """
 import asyncio
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -12,14 +13,13 @@ from shared.repl import read_multiline_input
 from shared.streaming import stream_response
 
 CYAN = "\033[0;36m"
-GREEN = "\033[0;32m"
 YELLOW = "\033[1;33m"
 DIM = "\033[2m"
 NC = "\033[0m"
 
 
 def main() -> None:
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env")  # repo root .env (CWD 무관)
     agent = build_db_query_agent()
 
     print(f"\n{CYAN}{'=' * 50}\n  db-query-analysis-agent (대화형)\n{'=' * 50}{NC}")
