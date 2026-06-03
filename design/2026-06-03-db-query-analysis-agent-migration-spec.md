@@ -181,8 +181,8 @@ async def review_sql(sql: str) -> str:
 - 테이블 추출: FROM/JOIN/UPDATE/INTO/TABLE 다음 식별자 파싱(별칭/백틱/스키마 접두 처리).
 
 **③ `analyze_sql_with_llm(sql: str, violations_json: str, meta_summary: str = "") -> dict`** — 별도 LLM 호출 (plain @tool).
-- **LLM 호출은 base code 패턴(Strands `BedrockModel`)으로** — raw boto3 converse 대신 `build_bedrock_model()` 헬퍼로 `BedrockModel(ANALYZE_MODEL_ID, temperature=0.1, max_tokens=2048)` 생성 후 **minimal tool-less Agent** 1회 호출. region/모델 구성이 메인 에이전트와 일관.
-- (주: 구현 세부 — analyze는 여전히 **plain tool**. orchestration/routing 없는 단일 LLM 호출이며 first-class sub-agent 아님. "단일 에이전트 + plain tool 3종" 결정 유지.)
+- **LLM 호출은 base code 패턴(Strands `BedrockModel`)으로** — raw boto3 converse 대신 `build_bedrock_model()` 헬퍼로 `BedrockModel(ANALYZE_MODEL_ID, temperature=0.1, max_tokens=2048)` 생성 후 **`BedrockModel`을 직접 호출**(`model.stream`, Agent 미생성) 1회 호출. region/모델 구성이 메인 에이전트와 일관.
+- (주: analyze는 plain tool이며 **시스템 내 Agent 객체는 메인 db-query 하나뿐** — analyze는 BedrockModel을 직접 호출. "단일 에이전트 + plain tool 3종" 결정과 완전 일치.)
 - 분석: 인덱스 효율, 서비스 영향도, 최적화 제안. **이미 ①에서 플래그된 항목 재언급 금지**(프롬프트 강제).
 - 반환: `{"index_efficiency": str, "service_impact": str, "optimizations": [str], "analysis": str}` (analyzer가 JSON 섹션 생성 → 파싱; 파싱 실패 시 raw 텍스트를 `analysis`에 보존).
 - 실패 시: `{"error": "...", "analysis": ""}` (에이전트 크래시 금지).
