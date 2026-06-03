@@ -41,6 +41,20 @@ def test_get_or_create_agent_caches(monkeypatch):
     assert calls["n"] == 2
 
 
+def test_get_or_create_agent_evicts_lru(monkeypatch):
+    """LRU: _MAX_SESSIONS 초과 시 가장 오래 안 쓴 세션을 축출, 최근 사용은 보존."""
+    monkeypatch.setattr(rt, "build_db_query_agent", lambda: object())
+    monkeypatch.setattr(rt, "_MAX_SESSIONS", 2)
+    rt._session_agents.clear()
+    a1 = rt._get_or_create_agent("s1")
+    rt._get_or_create_agent("s2")
+    rt._get_or_create_agent("s1")          # s1 재사용 → 최근으로 이동
+    rt._get_or_create_agent("s3")          # 한도(2) 초과 → 가장 오래된 s2 축출
+    assert "s2" not in rt._session_agents
+    assert set(rt._session_agents) == {"s1", "s3"}
+    assert rt._get_or_create_agent("s1") is a1   # s1은 보존(같은 객체)
+
+
 def test_entrypoint_missing_query():
     events = _collect(rt.review({}))
     assert events[0]["type"] == "agent_text_stream" and "query" in events[0]["text"]
