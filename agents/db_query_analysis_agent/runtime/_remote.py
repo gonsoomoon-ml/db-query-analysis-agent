@@ -20,8 +20,8 @@ def _parse_sse(line: bytes) -> dict | None:
     """SSE 'data: {...}' 또는 평문 JSON 라인 → dict. 실패 시 None."""
     try:
         text = line.decode("utf-8").strip()
-        if text.startswith("data: "):
-            text = text[6:]
+        if text.startswith("data:"):                 # 공백 유무 모두 허용
+            text = text[len("data:"):].lstrip()
         return json.loads(text) if text else None
     except (UnicodeDecodeError, json.JSONDecodeError):
         return None
@@ -46,16 +46,21 @@ def stream_invoke(query: str, session_id: str | None = None) -> str:
     resp = client.invoke_agent_runtime(**kwargs)
     chunks: list[str] = []
     if "text/event-stream" in resp.get("contentType", ""):
-        for line in resp["response"].iter_lines(chunk_size=1):
+        for line in resp["response"].iter_lines():
             ev = _parse_sse(line)
             if not ev:
                 continue
-            if ev.get("type") == "agent_text_stream":
+            etype = ev.get("type")
+            if etype == "agent_text_stream":
                 t = ev.get("text", "")
                 chunks.append(t)
                 print(t, end="", flush=True)
-            elif ev.get("type") == "token_usage":
+            elif etype == "token_usage":
                 print(f"\n{DIM}📊 usage: {ev.get('usage', {})}{NC}")
+            elif etype == "workflow_complete":
+                pass
+            else:  # 에러 프레임({"error":...})/미지 타입 — 조용히 버리지 않고 표면화
+                print(f"\n{DIM}[runtime] {ev}{NC}", flush=True)
         print()
     else:
         body = resp["response"].read().decode("utf-8")

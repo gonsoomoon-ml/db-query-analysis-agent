@@ -6,6 +6,12 @@ def test_parse_data_line():
         {"type": "agent_text_stream", "text": "hi"}
 
 
+def test_parse_data_line_no_space():
+    """'data:'(공백 없음) 접두사도 파싱 — SSE 구현체 차이에 견고."""
+    assert _parse_sse(b'data:{"type":"token_usage","usage":{}}') == \
+        {"type": "token_usage", "usage": {}}
+
+
 def test_parse_plain_json():
     assert _parse_sse(b'{"type":"workflow_complete"}') == {"type": "workflow_complete"}
 
