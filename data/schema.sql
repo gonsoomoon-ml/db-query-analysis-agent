@@ -1,7 +1,8 @@
--- 샘플 e-commerce 스키마 (TABLE_META 와 동일 구조). 향후 sample.db / EXPLAIN 용.
+-- 자동 생성: build_sqlite.py가 TABLE_META에서 생성. 직접 수정 금지.
+
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,
-  email TEXT NOT NULL,
+  email TEXT,
   name TEXT,
   created_at TEXT
 );
@@ -9,7 +10,7 @@ CREATE UNIQUE INDEX uq_users_email ON users(email);
 
 CREATE TABLE orders (
   id INTEGER PRIMARY KEY,
-  user_id INTEGER NOT NULL,
+  user_id INTEGER,
   status TEXT,
   total REAL,
   created_at TEXT
@@ -19,7 +20,7 @@ CREATE INDEX idx_orders_created_at ON orders(created_at);
 
 CREATE TABLE products (
   id INTEGER PRIMARY KEY,
-  sku TEXT NOT NULL,
+  sku TEXT,
   name TEXT,
   price REAL,
   category TEXT
@@ -29,8 +30,8 @@ CREATE INDEX idx_products_category ON products(category);
 
 CREATE TABLE order_items (
   id INTEGER PRIMARY KEY,
-  order_id INTEGER NOT NULL,
-  product_id INTEGER NOT NULL,
+  order_id INTEGER,
+  product_id INTEGER,
   qty INTEGER
 );
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);

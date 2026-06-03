@@ -1,21 +1,88 @@
-"""schema.sql → data/sample.db 생성 (옵션, 향후 EXPLAIN 용).
+"""TABLE_META → data/sample.db 생성 (Phase 1). 단일 진실 원천은 TABLE_META.
+
+sample.db = 테이블 + 인덱스 + table_stats(행수). schema.sql은 기본 빌드 시
+TABLE_META에서 재생성(파생 문서). sqlite backend / EXPLAIN이 이 DB를 읽음.
 
 사용: uv run python -m data.seed.build_sqlite
 """
 import sqlite3
 from pathlib import Path
 
+from data.mock.table_meta import TABLE_META
 
-def main() -> None:
-    data_dir = Path(__file__).resolve().parents[1]
-    ddl = (data_dir / "schema.sql").read_text(encoding="utf-8")
-    db_path = data_dir / "sample.db"
+_DATA_DIR = Path(__file__).resolve().parents[1]
+DB_PATH = _DATA_DIR / "sample.db"
+SCHEMA_PATH = _DATA_DIR / "schema.sql"
+
+
+def _pk_columns(table: str, meta: dict) -> list[str]:
+    """pk_<table> 인덱스의 컬럼(우리 컨벤션). 없으면 빈 리스트."""
+    for idx in meta["indexes"]:
+        if idx["name"] == f"pk_{table}":
+            return list(idx["columns"])
+    return []
+
+
+def _ddl_from_table_meta() -> str:
+    """TABLE_META → CREATE TABLE/INDEX DDL. 단일 컬럼 INTEGER PK 가정."""
+    parts: list[str] = []
+    for t, meta in TABLE_META.items():
+        pk = set(_pk_columns(t, meta))
+        col_defs = []
+        for c in meta["columns"]:
+            d = f'  {c["name"]} {c["type"]}'
+            if c["name"] in pk:
+                d += " PRIMARY KEY"
+            col_defs.append(d)
+        parts.append(f"CREATE TABLE {t} (\n" + ",\n".join(col_defs) + "\n);")
+        for idx in meta["indexes"]:
+            if idx["name"] == f"pk_{t}":
+                continue
+            uniq = "UNIQUE " if idx["unique"] else ""
+            cols = ", ".join(idx["columns"])
+            parts.append(f'CREATE {uniq}INDEX {idx["name"]} ON {t}({cols});')
+        parts.append("")
+    return "\n".join(parts)
+
+
+def build_sample_db(db_path: Path | None = None) -> Path:
+    """sample.db 재생성(멱등) — DDL 실행 + table_stats 적재. 기본 경로면 schema.sql도 재생성."""
+    is_default = db_path is None
+    db_path = db_path or DB_PATH
+    if db_path.exists():
+        db_path.unlink()
     con = sqlite3.connect(db_path)
-    con.executescript(ddl)
-    con.commit()
-    con.close()
-    print(f"✅ sample.db 생성: {db_path}")
+    try:
+        con.executescript(_ddl_from_table_meta())
+        con.execute("CREATE TABLE table_stats (table_name TEXT PRIMARY KEY, row_count INTEGER)")
+        con.executemany(
+            "INSERT INTO table_stats (table_name, row_count) VALUES (?, ?)",
+            [(t, meta["row_count"]) for t, meta in TABLE_META.items()],
+        )
+        con.commit()
+    finally:
+        con.close()
+    if is_default:
+        SCHEMA_PATH.write_text(
+            "-- 자동 생성: build_sqlite.py가 TABLE_META에서 생성. 직접 수정 금지.\n\n"
+            + _ddl_from_table_meta(),
+            encoding="utf-8",
+        )
+    return db_path
+
+
+def ensure_sample_db(db_path: Path | None = None) -> Path:
+    """없으면 build_sample_db() 후 경로 반환 (lazy)."""
+    target = db_path or DB_PATH
+    if not target.exists():
+        build_sample_db(db_path)
+    return target
 
 
 if __name__ == "__main__":
-    main()
+    p = build_sample_db()
+    con = sqlite3.connect(p)
+    tables = [r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+    con.close()
+    print(f"✅ sample.db 생성: {p}  테이블: {tables}")
