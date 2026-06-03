@@ -51,7 +51,10 @@ fi
 
 vendor_agent_pkg() {
     local dest_dir="$1"
-    log "벤더링: agents/ → $dest_dir"
+    # 두 번째 인자로 복사할 서브패키지를 지정(기본 전체). check/meta 는 불필요한 shared(strands
+    # 의존 agent.py 포함)를 제외해 zip 경량화 — check='tools', meta='tools meta', analyze='tools meta shared'.
+    local subpkgs="${2:-tools meta shared}"
+    log "벤더링: agents/[$subpkgs] → $dest_dir"
     rm -rf "$dest_dir/agents" "$dest_dir/data"
 
     # agents 패키지 — runtime/ local/ 제외
@@ -60,7 +63,7 @@ vendor_agent_pkg() {
     cp "$PROJECT_ROOT/agents/db_query_analysis_agent/__init__.py" \
        "$dest_dir/agents/db_query_analysis_agent/" 2>/dev/null || touch "$dest_dir/agents/db_query_analysis_agent/__init__.py"
 
-    for subpkg in tools meta shared; do
+    for subpkg in $subpkgs; do
         if [[ -d "$PROJECT_ROOT/agents/db_query_analysis_agent/$subpkg" ]]; then
             cp -r "$PROJECT_ROOT/agents/db_query_analysis_agent/$subpkg" \
                   "$dest_dir/agents/db_query_analysis_agent/$subpkg"
@@ -73,19 +76,28 @@ vendor_agent_pkg() {
     find "$dest_dir/agents" "$dest_dir/data" -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
 }
 
-# check_sql_rules — strands-free, agent pkg 만 복사
-log "Lambda 벤더링: check_sql_rules"
-vendor_agent_pkg "$PROJECT_ROOT/infra/cognito-gateway/lambda/check_sql_rules"
+# check_sql_rules — strands-free, tools 만 필요 (meta·shared 불필요)
+log "Lambda 벤더링: check_sql_rules (tools)"
+vendor_agent_pkg "$PROJECT_ROOT/infra/cognito-gateway/lambda/check_sql_rules" "tools"
 
-# get_table_meta — strands-free, agent pkg 만 복사
-log "Lambda 벤더링: get_table_meta"
-vendor_agent_pkg "$PROJECT_ROOT/infra/cognito-gateway/lambda/get_table_meta"
+# get_table_meta — strands-free, tools+meta 필요 (shared 불필요)
+log "Lambda 벤더링: get_table_meta (tools meta)"
+vendor_agent_pkg "$PROJECT_ROOT/infra/cognito-gateway/lambda/get_table_meta" "tools meta"
 
-# analyze_sql_with_llm — strands 필요 → pip install 후 agent pkg 복사
-log "Lambda 벤더링: analyze_sql_with_llm (pip install strands-agents)"
-vendor_agent_pkg "$PROJECT_ROOT/infra/cognito-gateway/lambda/analyze_sql_with_llm"
+# analyze_sql_with_llm — strands 필요. 빌드 호스트 python 과 Lambda(python3.12) 버전이 다르면
+# pydantic_core 등 네이티브 확장의 ABI 가 어긋나 import 실패 → Lambda 타깃(cp312/x86_64) 휠을
+# 강제 다운로드(--platform/--python-version/--only-binary). 스테일 휠 혼입 방지 위해 pip 산출물을
+# 먼저 청소(handler.py 만 보존) 후 재벤더링·재설치.
+log "Lambda 벤더링: analyze_sql_with_llm (tools meta shared + pip install strands-agents[cp312])"
+ANALYZE_DIR="$PROJECT_ROOT/infra/cognito-gateway/lambda/analyze_sql_with_llm"
+find "$ANALYZE_DIR" -mindepth 1 -maxdepth 1 ! -name handler.py -exec rm -rf {} +
+vendor_agent_pkg "$ANALYZE_DIR" "tools meta shared"
 pip install strands-agents \
-    -t "$PROJECT_ROOT/infra/cognito-gateway/lambda/analyze_sql_with_llm" \
+    -t "$ANALYZE_DIR" \
+    --platform manylinux2014_x86_64 \
+    --python-version 3.12 \
+    --implementation cp \
+    --only-binary=:all: \
     --quiet
 
 # ── 2. cfn package (Lambda Code 디렉토리 zip + S3 업로드) ─
