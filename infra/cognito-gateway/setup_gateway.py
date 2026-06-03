@@ -82,7 +82,8 @@ ANALYZE_SQL_TOOL_SCHEMA = [
         ),
         "inputSchema": {
             "type": "object",
-            "required": ["sql", "violations_json", "meta_summary"],
+            # meta_summary 는 파이썬 시그니처상 optional(default "") → required 에서 제외.
+            "required": ["sql", "violations_json"],
             "properties": {
                 "sql": {
                     "type": "string",

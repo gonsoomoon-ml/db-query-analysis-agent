@@ -119,6 +119,16 @@ def attach_oauth_provider(agent_id: str) -> None:
 
     OAUTH_PROVIDER_NAME을 repo root .env에 저장 (컨테이너 env_vars와 일치시킴).
     """
+    # 선행 검증 — gateway 모드(TOOLS_SOURCE 기본값)에 필요한 값이 모두 채워졌는지 먼저 확인.
+    # AWS 변경(IAM/provider) 이전에 fail-fast. GATEWAY_URL·COGNITO_GATEWAY_SCOPE도 포함 —
+    # 비면 런타임 첫 gateway invoke에서 실패. deploy.sh(Cognito+Gateway) 선행이 전제.
+    missing = [k for k in ("COGNITO_USER_POOL_ID", "COGNITO_DOMAIN", "COGNITO_CLIENT_ID",
+                           "COGNITO_CLIENT_SECRET", "GATEWAY_URL", "COGNITO_GATEWAY_SCOPE")
+               if not os.environ.get(k)]
+    if missing:
+        print(f"{RED}❌ {missing} 비어있음 — infra/cognito-gateway/deploy.sh 를 먼저 실행하세요{NC}")
+        sys.exit(1)
+
     ctrl = boto3.client("bedrock-agentcore-control", region_name=REGION)
     runtime_info = ctrl.get_agent_runtime(agentRuntimeId=agent_id)
     role_arn = runtime_info["roleArn"]
@@ -152,11 +162,6 @@ def attach_oauth_provider(agent_id: str) -> None:
     )
     print(f"{GREEN}✅ IAM: {role_name}/DbqOAuthExtras (OAuth2 권한){NC}")
 
-    missing = [k for k in ("COGNITO_USER_POOL_ID", "COGNITO_DOMAIN", "COGNITO_CLIENT_ID", "COGNITO_CLIENT_SECRET")
-               if not os.environ.get(k)]
-    if missing:
-        print(f"{RED}❌ {missing} 비어있음 — infra/cognito-gateway/deploy.sh 를 먼저 실행하세요{NC}")
-        sys.exit(1)
     user_pool_id = os.environ["COGNITO_USER_POOL_ID"]
     domain = os.environ["COGNITO_DOMAIN"]
     client_id = os.environ["COGNITO_CLIENT_ID"]
