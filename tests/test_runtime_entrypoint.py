@@ -84,10 +84,11 @@ def test_entrypoint_session_id_fallbacks(monkeypatch):
 def test_review_gateway_mode(monkeypatch):
     """TOOLS_SOURCE=gateway 시:
     - _fetch_gateway_token()으로 토큰 획득
-    - agent_session(token=tok) contextmanager 경유 (stateless, per-invoke)
-    - _get_or_create_agent는 호출되지 않음
+    - agent_session(token=tok) 경유로 agent 생성 후 세션 캐시에 보관(warm)
+    - inprocess의 _get_or_create_agent는 호출되지 않음
     """
     monkeypatch.setenv("TOOLS_SOURCE", "gateway")
+    rt._gateway_sessions.clear()
 
     # _fetch_gateway_token async stub — "tok" 반환
     async def _fake_fetch_gateway_token():
@@ -122,3 +123,32 @@ def test_review_gateway_mode(monkeypatch):
 
     # 토큰이 agent_session에 전달됐는지 검증
     assert captured_token["token"] == "tok"
+
+
+def test_review_gateway_warm_reuses_agent(monkeypatch):
+    """gateway warm: 같은 session_id 두 번째 호출은 캐시된 agent 재사용 — 토큰·agent_session 1회만."""
+    monkeypatch.setenv("TOOLS_SOURCE", "gateway")
+    rt._gateway_sessions.clear()
+    calls = {"token": 0, "session": 0}
+
+    async def _fake_token():
+        calls["token"] += 1
+        return "tok"
+
+    monkeypatch.setattr(rt, "_fetch_gateway_token", _fake_token)
+
+    shared_agent = _FakeAgent()
+
+    @contextlib.contextmanager
+    def _fake_agent_session(system_prompt_filename=None, token=None):
+        calls["session"] += 1
+        yield shared_agent
+
+    monkeypatch.setattr(rt, "agent_session", _fake_agent_session)
+
+    _collect(rt.review({"query": "q1", "session_id": "S-warm"}))
+    _collect(rt.review({"query": "q2", "session_id": "S-warm"}))   # 같은 세션 → 캐시 재사용
+
+    assert calls["token"] == 1    # 토큰은 첫 호출만
+    assert calls["session"] == 1  # MCP open + list_tools + create_agent(agent_session)도 첫 호출만
+    assert "S-warm" in rt._gateway_sessions

@@ -223,7 +223,7 @@ bash infra/cognito-gateway/teardown.sh
 - `TOOLS_SOURCE=inprocess`(기본)로 두면 Cognito/Gateway 없이 오프라인 동작(§2) — 회귀 확인용.
 - analyze Lambda 는 `DB_PATH=/tmp` 로 EXPLAIN용 `sample.db` 를 빌드(읽기전용 `/var/task` 우회). 실패해도 graceful(분석은 정상).
 
-**게이트웨이 chat (멀티턴)** — 두 경로가 있고 warm 동작이 다릅니다:
+**게이트웨이 chat (멀티턴)** — 로컬·원격 두 경로 모두 warm(세션 캐시):
 
 ```bash
 # (A) 로컬 gateway chat — 한 세션에서 agent 재사용 → warm 멀티턴 + Gateway 경유 도구
@@ -247,7 +247,7 @@ uv run python -m agents.db_query_analysis_agent.runtime.chat
 > /quit
 ```
 
-⚠️ **warm 차이(중요)**: (A) 로컬 chat은 한 `agent_session` 안에서 agent를 재사용해 **맥락이 이어집니다**. 그러나 (B) **배포된 Runtime의 gateway 모드는 invoke당 stateless**(§9 설계 — 매 호출 새 agent를 Gateway로 구성)라 `runtime.chat`의 각 턴은 **독립**입니다("방금 그 쿼리"가 안 통함 → 각 턴이 별도 리뷰). 원격에서 warm 멀티턴이 필요하면 `TOOLS_SOURCE=inprocess`(기본, §3) 모드를 쓰세요.
+✅ **둘 다 warm**: (A) 로컬은 한 `agent_session` 안에서 agent를 재사용하고, (B) 배포된 Runtime의 gateway 모드는 **`session_id`별 (agent, 열린 MCP)을 캐시·재사용**(`_gateway_sessions`)해 같은 `runtimeSessionId`의 턴들이 맥락을 잇습니다 — 위 예시의 "방금 쿼리"가 로컬·원격 모두 통합니다. 첫 호출만 토큰+`list_tools`+agent 생성, 이후 재사용(Phase 2 inprocess 캐시와 동일 패턴). caveat: 원격은 첫 호출 JWT를 계속 써서 토큰 TTL(~1h)을 넘는 긴 세션은 만료 가능(일반 chat 길이엔 무방).
 
 ## 참고: 토큰 캐시 (Cache R/W 0/0)
 
