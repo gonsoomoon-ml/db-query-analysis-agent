@@ -1,5 +1,6 @@
 """단발 원격 호출 (SigV4). uv run -m agents.db_query_analysis_agent.runtime.invoke_runtime --query "..." """
 import argparse
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -10,10 +11,10 @@ NC = "\033[0m"
 
 
 def main() -> None:
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env")  # repo root .env (CWD 무관)
     p = argparse.ArgumentParser(description="db-query-analysis-agent 원격 단발 호출")
     p.add_argument("--query", required=True, help="리뷰 요청(자연어/SQL)")
-    p.add_argument("--session-id", default=None, help="멀티턴 재사용(≥33자)")
+    p.add_argument("--session-id", default=None, help="멀티턴 재사용(33–128자)")
     args = p.parse_args()
     if args.session_id and not (33 <= len(args.session_id) <= 128):
         p.error("--session-id 는 33–128자 (AgentCore 제약)")
