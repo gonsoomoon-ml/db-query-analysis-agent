@@ -5,11 +5,13 @@ LLM 호출은 Strands BedrockModel을 직접 사용 — Agent를 만들지 않�
 """
 import json
 import re
+import sqlite3
 from pathlib import Path
 
 from strands import tool
 
 from agents.db_query_analysis_agent.shared.model import build_bedrock_model
+from data.seed.build_sqlite import ensure_sample_db
 
 _PROMPT_PATH = Path(__file__).resolve().parents[1] / "shared" / "prompts" / "analyze_prompt.md"
 
@@ -39,6 +41,26 @@ async def _invoke_model(user_msg: str) -> str:
         if "text" in delta:
             chunks.append(delta["text"])
     return "".join(chunks)
+
+
+def run_explain(sql: str) -> str | None:
+    """sample.db에 EXPLAIN QUERY PLAN 실행 → 사람이 읽는 플랜 요약. 실패 시 None.
+
+    read-only로 열어 어떤 쿼리(DELETE/DROP 포함)도 실행되지 않음 — EXPLAIN은
+    플랜만 기술. 실패(유효치 않은 SQL/미존재 테이블/빌드 불가) → None (graceful).
+    """
+    try:
+        db_path = ensure_sample_db()
+        con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        try:
+            rows = con.execute("EXPLAIN QUERY PLAN " + sql).fetchall()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        return None
+    # rows: (id, parent, notused, detail)
+    details = [r[3] for r in rows if len(r) >= 4 and r[3]]
+    return "\n".join(details) if details else None
 
 
 def _parse(text: str) -> dict:
