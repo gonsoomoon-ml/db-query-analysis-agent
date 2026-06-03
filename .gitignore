@@ -5,3 +5,11 @@ __pycache__/
 data/sample.db
 .pytest_cache/
 .claude/
+
+# Phase 2 runtime build artifacts (toolkit-generated / copied build context)
+agents/db_query_analysis_agent/runtime/agents/
+agents/db_query_analysis_agent/runtime/shared/
+agents/db_query_analysis_agent/runtime/data/
+agents/db_query_analysis_agent/runtime/Dockerfile
+agents/db_query_analysis_agent/runtime/.dockerignore
+agents/db_query_analysis_agent/runtime/.bedrock_agentcore.yaml
