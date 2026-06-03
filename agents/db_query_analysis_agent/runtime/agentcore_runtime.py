@@ -8,11 +8,13 @@ from pathlib import Path
 from typing import Any, AsyncGenerator
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
-# 로컬: repo root (parents[2] = repo root from runtime/ dir), 컨테이너: build context root(/app).
-# parents[0]=db_query_analysis_agent, parents[1]=agents, parents[2]=repo root
-for _p in (_SCRIPT_DIR.parents[2], _SCRIPT_DIR):
-    if _p.exists() and str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+# 최상위 패키지(agents/·shared/)를 포함한 루트를 sys.path에 추가. 컨테이너(/app, 평탄 복사)와
+# 로컬(repo root) 양쪽을 IndexError 없이 처리 — self→parents 순으로 첫 매칭 루트를 사용.
+for _root in (_SCRIPT_DIR, *_SCRIPT_DIR.parents):
+    if (_root / "agents").is_dir() and (_root / "shared").is_dir():
+        if str(_root) not in sys.path:
+            sys.path.insert(0, str(_root))
+        break
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 
