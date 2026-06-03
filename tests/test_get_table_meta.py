@@ -50,3 +50,13 @@ def test_backend_reported():
     out = collect_table_meta("SELECT * FROM users")
     assert out["backend"] == "mock"
     assert out["large_table_threshold"] == 1_000_000
+
+
+def test_extract_ignores_from_inside_string_literal():
+    # 작은따옴표 문자열 안의 FROM 은 테이블로 추출되지 않음
+    assert extract_table_names("SELECT * FROM orders WHERE note = 'sync FROM cache'") == ["orders"]
+
+
+def test_extract_keeps_double_quoted_identifier():
+    # 큰따옴표 식별자(테이블명)는 보존되어 추출됨
+    assert extract_table_names('SELECT * FROM "orders"') == ["orders"]

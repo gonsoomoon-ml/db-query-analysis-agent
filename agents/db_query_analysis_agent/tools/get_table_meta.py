@@ -16,6 +16,16 @@ _TABLE_RE = re.compile(
     re.IGNORECASE,
 )
 
+_COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.DOTALL)
+_COMMENT_LINE = re.compile(r"--[^\n]*")
+_SQUOTE_STRING = re.compile(r"'(?:[^']|'')*'")  # 작은따옴표 문자열 리터럴만 (식별자 보호)
+
+
+def _strip_noise(sql: str) -> str:
+    """주석 + 작은따옴표 문자열 제거. 큰따옴표/백틱/대괄호(식별자)는 보존."""
+    s = _COMMENT_LINE.sub(" ", _COMMENT_BLOCK.sub(" ", sql))
+    return _SQUOTE_STRING.sub(" ", s)
+
 
 def _clean_ident(tok: str) -> str:
     tok = tok.strip()
@@ -25,9 +35,9 @@ def _clean_ident(tok: str) -> str:
 
 
 def extract_table_names(sql: str) -> list[str]:
-    """SQL에서 테이블명 목록(중복 제거, 등장 순서) 추출."""
+    """SQL에서 테이블명 목록(중복 제거, 등장 순서) 추출. 주석/문자열 리터럴 내 키워드 무시."""
     names: list[str] = []
-    for m in _TABLE_RE.finditer(sql or ""):
+    for m in _TABLE_RE.finditer(_strip_noise(sql or "")):
         n = _clean_ident(m.group(1))
         if n and n not in names:
             names.append(n)

@@ -19,8 +19,8 @@ def build_bedrock_model(
     kwargs = {
         "model_id": os.environ.get(model_id_env) or default_model,
         "region_name": os.environ.get("AWS_REGION") or "us-east-1",
-        "temperature": float(os.environ.get(temp_env, default_temp)),
-        "max_tokens": int(os.environ.get(max_tok_env, default_max_tok)),
+        "temperature": float(os.environ.get(temp_env) or default_temp),
+        "max_tokens": int(os.environ.get(max_tok_env) or default_max_tok),
     }
     if cache_tools:
         kwargs["cache_tools"] = "default"

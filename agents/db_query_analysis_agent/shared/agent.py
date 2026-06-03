@@ -33,8 +33,10 @@ def _load_prompt(filename: str) -> str:
 def create_agent(tools: list, system_prompt_filename: str) -> Agent:
     """Strands Agent 생성. model_id/temp/max_tokens는 DBQUERY_* env."""
     model = build_bedrock_model(
-        "DBQUERY_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "DBQUERY_TEMPERATURE", 0.1, "DBQUERY_MAX_TOKENS", 4096,
+        model_id_env="DBQUERY_MODEL_ID",
+        default_model="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        temp_env="DBQUERY_TEMPERATURE", default_temp=0.1,
+        max_tok_env="DBQUERY_MAX_TOKENS", default_max_tok=4096,
     )
     prompt = _load_prompt(system_prompt_filename)
     agent = Agent(

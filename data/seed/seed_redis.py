@@ -1,4 +1,4 @@
-"""TABLE_META를 Redis에 적재 (Stage 2). tablemeta:{name} = JSON.
+"""TABLE_META를 Redis에 적재 (Stage 2). tablemeta:{DEMO_USER}:{name} = JSON.
 
 사용: uv run python -m data.seed.seed_redis   (redis 가동 + redis 패키지 필요)
 """

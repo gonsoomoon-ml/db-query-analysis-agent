@@ -30,3 +30,10 @@ def test_exception_returns_error(monkeypatch):
     monkeypatch.setattr(mod, "_invoke_model", _boom)
     out = asyncio.run(mod.run_analysis("SELECT 1", "[]", ""))
     assert "error" in out and out["analysis"] == ""
+
+
+def test_parses_fenced_json(monkeypatch):
+    fenced = '```json\n{"index_efficiency":"ok","service_impact":"low","optimizations":[],"analysis":"a"}\n```'
+    monkeypatch.setattr(mod, "_invoke_model", _returning(fenced))
+    out = asyncio.run(mod.run_analysis("SELECT 1", "[]", ""))
+    assert out["index_efficiency"] == "ok"
