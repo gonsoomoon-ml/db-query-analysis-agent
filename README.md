@@ -74,7 +74,7 @@ text = await review_sql("SELECT * FROM orders WHERE user_id = 1")
 
 ## 테스트 가이드
 
-테스트는 3계층입니다: **단위 테스트**(오프라인·AWS 불필요) → **로컬 e2e**(실제 Bedrock 호출) → **원격 e2e**(배포된 AgentCore Runtime).
+테스트는 4계층입니다: **단위 테스트**(오프라인·AWS 불필요) → **로컬 e2e**(실제 Bedrock 호출) → **원격 e2e**(배포된 AgentCore Runtime, SigV4) → **게이트웨이 e2e**(Cognito-보안 Gateway · Phase 3).
 
 ### 0. 사전 준비
 
@@ -187,6 +187,41 @@ bash agents/db_query_analysis_agent/runtime/teardown.sh
 - **턴 2~4가 직전 쿼리/답변을 추가 설명 없이 이해하면 warm 세션 정상** (같은 `runtimeSessionId` 재사용 → 컨테이너가 `agent.messages` 보존). 맥락을 잃거나 "어떤 쿼리?"를 되물으면 세션이 안 붙은 것.
 - `/reset` 직후엔 새 세션 id라 맥락이 초기화(cold)됨 — 일부러 확인해볼 것.
 - 세션 키는 `runtimeSessionId`(헤더)를 우선 사용하므로 payload 없이 헤더만으로도 세션이 격리됩니다.
+
+### 4. 게이트웨이 e2e (Cognito + AgentCore Gateway · Phase 3)
+
+SQL 도구를 Cognito-보안 Gateway(MCP)로 노출하고 Runtime이 `TOOLS_SOURCE=gateway`로 소비하는 경로. 인바운드는 그대로 SigV4, 아웃바운드(Runtime→Gateway)만 Cognito M2M JWT. AWS 자격증명 + CFN/Lambda/Gateway/Bedrock 권한 필요.
+
+```bash
+# 1) Cognito + Gateway + Lambda ×3 배포 (CFN + boto3). .env 에 COGNITO_*/GATEWAY_* 자동 기록.
+bash infra/cognito-gateway/deploy.sh
+
+# 2) 표준 MCP 클라이언트 검증 (SigV4 Runtime 무관 — Cognito JWT 직접):
+uv run python -c "
+from dotenv import load_dotenv; load_dotenv()
+from agents.db_query_analysis_agent.shared.gateway import get_gateway_token, create_mcp_client
+with create_mcp_client(get_gateway_token()) as m:
+    print([t.tool_name for t in m.list_tools_sync()])
+    print(m.call_tool_sync(tool_use_id='v', name='check-sql-rules___check_sql_rules', arguments={'sql':'SELECT * FROM orders'}))
+"
+
+# 3) Runtime 을 gateway 모드로 재배포 (OAuth2 provider 생성 + TOOLS_SOURCE=gateway 주입):
+uv run python -m agents.db_query_analysis_agent.runtime.deploy_runtime
+# 4) gateway 경유 invoke (Runtime → Cognito JWT → Gateway → Lambda):
+uv run python -m agents.db_query_analysis_agent.runtime.invoke_runtime --query "SELECT * FROM orders WHERE user_id = 1"
+
+# 5) 로컬에서도 gateway 모드(직접 토큰)로 호출 가능:
+TOOLS_SOURCE=gateway uv run -m agents.db_query_analysis_agent.local.run --sql "SELECT * FROM orders WHERE user_id = 1"
+
+# 6) 정리 — target → Gateway → CFN 스택 삭제:
+bash infra/cognito-gateway/teardown.sh
+```
+
+확인 포인트:
+- (2) `list_tools` 에 `check-sql-rules___check_sql_rules` · `get-table-meta___get_table_meta` · `analyze-sql-with-llm___analyze_sql_with_llm` 3개 노출 + 호출 시 `{"violations":[...]}` 반환.
+- (4) gateway invoke 가 SigV4 invoke 와 동일한 리뷰를 스트리밍(차이는 도구가 Gateway·Lambda 경유라는 점뿐). **`runtimeUserId` 필수** — 없으면 workload identity 토큰 획득 실패.
+- `TOOLS_SOURCE=inprocess`(기본)로 두면 Cognito/Gateway 없이 오프라인 동작(§2) — 회귀 확인용.
+- analyze Lambda 는 `DB_PATH=/tmp` 로 EXPLAIN용 `sample.db` 를 빌드(읽기전용 `/var/task` 우회). 실패해도 graceful(분석은 정상).
 
 ## 참고: 토큰 캐시 (Cache R/W 0/0)
 
