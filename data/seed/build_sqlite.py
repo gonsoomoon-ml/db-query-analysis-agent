@@ -1,7 +1,6 @@
 """TABLE_META → data/sample.db 생성 (Phase 1). 단일 진실 원천은 TABLE_META.
 
-sample.db = 테이블 + 인덱스 + table_stats(행수). schema.sql은 기본 빌드 시
-TABLE_META에서 재생성(파생 문서). sqlite backend / EXPLAIN이 이 DB를 읽음.
+sample.db = 테이블 + 인덱스 + table_stats(행수). sqlite backend / EXPLAIN이 이 DB를 읽음.
 
 사용: uv run python -m data.seed.build_sqlite
 """
@@ -12,7 +11,6 @@ from data.mock.table_meta import TABLE_META
 
 _DATA_DIR = Path(__file__).resolve().parents[1]
 DB_PATH = _DATA_DIR / "sample.db"
-SCHEMA_PATH = _DATA_DIR / "schema.sql"
 
 
 def _pk_columns(table: str, meta: dict) -> list[str]:
@@ -46,8 +44,7 @@ def _ddl_from_table_meta() -> str:
 
 
 def build_sample_db(db_path: Path | None = None) -> Path:
-    """sample.db 재생성(멱등) — DDL 실행 + table_stats 적재. 기본 경로면 schema.sql도 재생성."""
-    is_default = db_path is None
+    """sample.db 재생성(멱등) — DDL 실행 + table_stats 적재."""
     db_path = db_path or DB_PATH
     if db_path.exists():
         db_path.unlink()
@@ -62,12 +59,6 @@ def build_sample_db(db_path: Path | None = None) -> Path:
         con.commit()
     finally:
         con.close()
-    if is_default:
-        SCHEMA_PATH.write_text(
-            "-- 자동 생성: build_sqlite.py가 TABLE_META에서 생성. 직접 수정 금지.\n\n"
-            + _ddl_from_table_meta(),
-            encoding="utf-8",
-        )
     return db_path
 
 

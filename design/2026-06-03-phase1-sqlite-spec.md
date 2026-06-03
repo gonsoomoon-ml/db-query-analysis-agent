@@ -3,6 +3,8 @@
 > 작성일: 2026-06-03
 > 선행: Stage 1 구현 완료(`main`), `design/2026-06-03-db-query-analysis-agent-migration-spec.md`
 > 로드맵: **SQLite(본 phase) → AgentCore Runtime(+Redis) → Cognito/Gateway → A2A/Supervisor**
+>
+> **개정(2026-06-03):** `schema.sql` 제거 — 코드가 읽지 않는 미사용 생성물이라 삭제. `sample.db`는 `TABLE_META`에서 직접 생성(단일 source 유지). 본문의 schema.sql 재생성 언급(§2/§4/§5.1)은 무효.
 
 ---
 
