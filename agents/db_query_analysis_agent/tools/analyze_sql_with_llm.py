@@ -80,13 +80,16 @@ def _parse(text: str) -> dict:
 
 
 async def run_analysis(sql: str, violations_json: str, meta_summary: str = "") -> dict:
-    """심층 분석 1회 호출 + 파싱. 실패 시 {"error":..., "analysis":""}."""
+    """심층 분석 1회 호출 + 파싱. 실제 플랜(EXPLAIN) 있으면 주입. 실패 시 {"error":..., "analysis":""}."""
     try:
+        plan = run_explain(sql)
         user_msg = (
             f"## SQL\n{sql}\n\n"
             f"## 이미 탐지된 규칙 위반 (재언급 금지)\n{violations_json}\n\n"
             f"## 테이블 메타\n{meta_summary or '(없음)'}"
         )
+        if plan:
+            user_msg += f"\n\n## 실제 쿼리 플랜 (EXPLAIN QUERY PLAN)\n{plan}"
         return _parse(await _invoke_model(user_msg))
     except Exception as e:  # noqa: BLE001
         return {"error": str(e), "analysis": ""}
