@@ -66,6 +66,17 @@ def collect_table_meta(sql: str) -> dict:
             "large_table_threshold": threshold}
 
 
+# Lambda 핸들러 등 외부에서 임포트할 수 있도록 공개 별칭 제공.
+# @tool 래퍼와 Lambda 핸들러 양쪽이 동일한 순수 함수를 호출한다.
+def table_meta_core(sql: str) -> dict:
+    """테이블 메타 조회 순수 함수 (Lambda/직접 호출 공유 진입점).
+
+    collect_table_meta 와 동일한 결과를 반환한다.
+    반환 형식: {"tables": [...], "backend": str, "large_table_threshold": int}
+    """
+    return collect_table_meta(sql)
+
+
 @tool
 def get_table_meta(sql: str) -> dict:
     """SQL에서 테이블명을 추출하고 메타데이터(스키마/인덱스/행수)를 조회.
@@ -73,4 +84,4 @@ def get_table_meta(sql: str) -> dict:
     행수 > LARGE_TABLE_THRESHOLD 면 large_table=true. 미존재 테이블은 found=false.
     필수 파라미터: sql (str) — 반드시 "sql" 키 사용. "table_name" 금지.
     """
-    return collect_table_meta(sql)
+    return table_meta_core(sql)

@@ -68,6 +68,17 @@ def evaluate_sql_rules(sql: str) -> dict:
     return {"violations": violations, "checked_rules": CHECKED_RULES}
 
 
+# Lambda 핸들러 등 외부에서 임포트할 수 있도록 공개 별칭 제공.
+# @tool 래퍼와 Lambda 핸들러 양쪽이 동일한 순수 함수를 호출한다.
+def check_rules_core(sql: str) -> dict:
+    """규칙 기반 SQL 정적 분석 순수 함수 (Lambda/직접 호출 공유 진입점).
+
+    evaluate_sql_rules 와 동일한 결과를 반환한다.
+    반환 형식: {"violations": [...], "checked_rules": [...]}
+    """
+    return evaluate_sql_rules(sql)
+
+
 @tool
 def check_sql_rules(sql: str) -> dict:
     """MySQL/SQL 쿼리의 규칙 기반 정적 분석.
@@ -75,4 +86,4 @@ def check_sql_rules(sql: str) -> dict:
     DELETE/UPDATE without WHERE, DROP, TRUNCATE, SELECT *, LIKE 선행 와일드카드 탐지.
     필수 파라미터: sql (str) — 반드시 "sql" 키 사용. "query" 금지.
     """
-    return evaluate_sql_rules(sql)
+    return check_rules_core(sql)
