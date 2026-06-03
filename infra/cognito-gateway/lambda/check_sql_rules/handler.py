@@ -10,12 +10,6 @@ AgentCore Gateway 호출 패턴:
 from agents.db_query_analysis_agent.tools.check_sql_rules import check_rules_core
 
 
-def _tool_name(context) -> str:
-    cc = getattr(context, "client_context", None)
-    custom = getattr(cc, "custom", None) if cc else None
-    return (custom or {}).get("bedrockAgentCoreToolName", "")
-
-
 def handler(event, context):
     sql = (event or {}).get("sql", "")
     try:

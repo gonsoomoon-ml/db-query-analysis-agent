@@ -152,6 +152,11 @@ def attach_oauth_provider(agent_id: str) -> None:
     )
     print(f"{GREEN}✅ IAM: {role_name}/DbqOAuthExtras (OAuth2 권한){NC}")
 
+    missing = [k for k in ("COGNITO_USER_POOL_ID", "COGNITO_DOMAIN", "COGNITO_CLIENT_ID", "COGNITO_CLIENT_SECRET")
+               if not os.environ.get(k)]
+    if missing:
+        print(f"{RED}❌ {missing} 비어있음 — infra/cognito-gateway/deploy.sh 를 먼저 실행하세요{NC}")
+        sys.exit(1)
     user_pool_id = os.environ["COGNITO_USER_POOL_ID"]
     domain = os.environ["COGNITO_DOMAIN"]
     client_id = os.environ["COGNITO_CLIENT_ID"]

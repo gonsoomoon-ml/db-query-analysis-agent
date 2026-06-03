@@ -12,12 +12,6 @@ import asyncio
 from agents.db_query_analysis_agent.tools.analyze_sql_with_llm import run_analysis
 
 
-def _tool_name(context) -> str:
-    cc = getattr(context, "client_context", None)
-    custom = getattr(cc, "custom", None) if cc else None
-    return (custom or {}).get("bedrockAgentCoreToolName", "")
-
-
 def handler(event, context):
     params = event or {}
     sql = params.get("sql", "")

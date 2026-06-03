@@ -163,6 +163,8 @@ Resources:
       Environment:
         Variables:
           DEMO_USER: !Ref DemoUser
+          # /var/task 는 읽기전용 → EXPLAIN용 sample.db 를 쓰기가능한 /tmp 에 빌드(inprocess와 parity).
+          DB_PATH: /tmp/dbq-sample.db
 
   # === IAM — Gateway execution role ===================================
 
