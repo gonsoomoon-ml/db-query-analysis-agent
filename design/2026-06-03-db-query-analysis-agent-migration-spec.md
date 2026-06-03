@@ -241,6 +241,7 @@ def lookup_table_meta(table_name: str) -> dict | None:
 | 변수 | 기본값 | 비고 |
 |---|---|---|
 | `AWS_REGION` | `us-east-1` | 원본은 us-east-2 — env로 조정 |
+| `DEMO_USER` | `ubuntu` | 멀티시연자 prefix (Redis 키 `tablemeta:{DEMO_USER}:` + 에이전트명 suffix) |
 | `DBQUERY_MODEL_ID` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | 원본 충실 |
 | `DBQUERY_TEMPERATURE` | `0.1` | 원본 충실 (결정적 리뷰) |
 | `DBQUERY_MAX_TOKENS` | `4096` | 최종 리뷰 길이 (원본 summarizer 2048 대비 여유) |

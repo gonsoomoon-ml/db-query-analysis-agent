@@ -6,8 +6,7 @@ MySQL/SQL 쿼리 1차 리뷰 에이전트 (Strands Agents + AWS Bedrock). 규칙
 ## 빠른 시작 (Stage 1: mock)
 
 ```bash
-uv sync --extra dev
-cp .env.example .env          # AWS_REGION / 모델 ID 확인 (Bedrock 액세스 필요)
+bash bootstrap.sh                # uv sync + .env 생성 + AWS_REGION/DEMO_USER + 테스트
 # 단발
 uv run -m agents.db_query_analysis_agent.local.run --sql "DELETE FROM orders"
 # 대화형
