@@ -2,6 +2,7 @@
 uv run -m agents.db_query_analysis_agent.runtime.chat
 """
 import uuid
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -19,7 +20,7 @@ def _new_session_id() -> str:
 
 
 def main() -> None:
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env")  # repo root .env (CWD 무관)
     session_id = _new_session_id()
     print(f"\n{CYAN}{'=' * 50}\n  db-query-analysis-agent (원격 대화형)\n{'=' * 50}{NC}")
     print(f"{DIM}  여러 줄 입력 후 빈 줄(Enter)로 전송 · /reset 새 세션 · /quit 종료{NC}\n")
