@@ -17,6 +17,8 @@ dev = ["pytest>=8.0.0", "ruff>=0.7.0", "bedrock-agentcore-starter-toolkit>=0.1.1
 [tool.pytest.ini_options]
 pythonpath = ["."]
 addopts = "-q"
+# tests/ 만 수집 — 배포 시 infra/.../lambda/ 에 생기는 벤더링 복사본(중복 agents/data)을 수집하지 않도록.
+testpaths = ["tests"]
 
 [tool.ruff]
 # Lambda 디렉터리는 핸들러 + (배포 시 transient) 벤더링 복사본이 섞여 있어 제외.

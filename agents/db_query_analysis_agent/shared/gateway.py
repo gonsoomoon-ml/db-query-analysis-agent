@@ -27,27 +27,6 @@ def _require_env(name: str) -> str:
     return val
 
 
-def _fetch_token_via_provider() -> str:
-    """Phase 3+ 정상 경로 — AgentCore Identity의 OAuth provider 경유.
-
-    boto3 ``get_resource_oauth2_token`` 호출 → Cognito JWT 반환.
-    clientSecret은 provider 등록 시 한 번만 입력되므로 직접 다루지 않음.
-    """
-    import boto3
-
-    region = os.environ.get("AWS_REGION") or "us-east-1"
-    provider_name = _require_env("OAUTH_PROVIDER_NAME")
-    scope = _require_env("COGNITO_GATEWAY_SCOPE")
-
-    agentcore = boto3.client("bedrock-agentcore", region_name=region)
-    response = agentcore.get_resource_oauth2_token(
-        resourceCredentialProviderName=provider_name,
-        scopes=[scope],
-        oauth2Flow="M2M",
-    )
-    return response["accessToken"]
-
-
 def _fetch_token_direct() -> str:
     """Standalone fallback — Cognito token endpoint 직접 호출 (urllib + HTTP Basic auth).
 
@@ -80,14 +59,12 @@ def _fetch_token_direct() -> str:
 
 
 def get_gateway_token() -> str:
-    """Cognito Bearer JWT 획득 — env 기반 자동 dispatch.
+    """Cognito Bearer JWT — standalone(로컬/표준 클라이언트 검증)용 direct client_credentials.
 
-    ``OAUTH_PROVIDER_NAME`` 설정 시 → AgentCore Identity 경유 (Phase 3+ 정상 경로).
-    미설정 시 → Cognito 직접 호출 (standalone 검증용).
-    두 경로 모두 동일 JWT 문자열 반환.
+    Runtime(컨테이너)은 이 함수가 아니라 @requires_access_token 데코레이터로 토큰을 얻는다.
+    provider 경로(get_resource_oauth2_token)는 workloadIdentityToken(컨테이너 컨텍스트)이
+    필요해 standalone에선 쓸 수 없으므로, OAUTH_PROVIDER_NAME 설정 여부와 무관하게 항상 direct.
     """
-    if os.environ.get("OAUTH_PROVIDER_NAME"):
-        return _fetch_token_via_provider()
     return _fetch_token_direct()
 
 

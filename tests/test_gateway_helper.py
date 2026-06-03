@@ -4,42 +4,14 @@ import json
 import pytest
 
 # ---------------------------------------------------------------------------
-# get_gateway_token — provider 경로 (OAUTH_PROVIDER_NAME 설정)
+# get_gateway_token — 항상 direct client_credentials (standalone 전용).
+# Runtime은 @requires_access_token 데코레이터로 토큰을 얻으므로 이 함수를 쓰지 않는다.
+# provider 경로(get_resource_oauth2_token)는 workloadIdentityToken이 필요해 standalone 불가.
 # ---------------------------------------------------------------------------
 
-def test_get_gateway_token_via_provider(monkeypatch):
-    """OAUTH_PROVIDER_NAME 설정 시 boto3 경유 토큰 반환 검증."""
-    monkeypatch.setenv("OAUTH_PROVIDER_NAME", "my-provider")
-    monkeypatch.setenv("COGNITO_GATEWAY_SCOPE", "https://example.com/invoke")
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-
-    fake_token = "provider-jwt-abc123"
-
-    class _FakeAgentCore:
-        def get_resource_oauth2_token(self, **kwargs):
-            assert kwargs["resourceCredentialProviderName"] == "my-provider"
-            assert kwargs["scopes"] == ["https://example.com/invoke"]
-            assert kwargs["oauth2Flow"] == "M2M"
-            return {"accessToken": fake_token}
-
-    def _fake_boto3_client(service, region_name=None):
-        assert service == "bedrock-agentcore"
-        return _FakeAgentCore()
-
-    import boto3
-    monkeypatch.setattr(boto3, "client", _fake_boto3_client)
-
-    from agents.db_query_analysis_agent.shared.gateway import get_gateway_token
-    assert get_gateway_token() == fake_token
-
-
-# ---------------------------------------------------------------------------
-# get_gateway_token — direct 경로 (OAUTH_PROVIDER_NAME 미설정)
-# ---------------------------------------------------------------------------
-
-def test_get_gateway_token_direct(monkeypatch):
-    """OAUTH_PROVIDER_NAME 미설정 시 Cognito 직접 호출 경로 검증."""
-    monkeypatch.delenv("OAUTH_PROVIDER_NAME", raising=False)
+def test_get_gateway_token_direct_even_with_provider_env(monkeypatch):
+    """OAUTH_PROVIDER_NAME이 설정돼 있어도 standalone은 direct(client_credentials)를 쓴다 (회귀)."""
+    monkeypatch.setenv("OAUTH_PROVIDER_NAME", "ignored-in-standalone")
     monkeypatch.setenv("COGNITO_DOMAIN", "mypool")
     monkeypatch.setenv("COGNITO_CLIENT_ID", "clientid123")
     monkeypatch.setenv("COGNITO_CLIENT_SECRET", "secret456")
