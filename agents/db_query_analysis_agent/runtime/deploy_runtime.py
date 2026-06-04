@@ -65,17 +65,19 @@ def _runtime_env_vars() -> dict:
         "AWS_REGION": REGION,
         "DEMO_USER": DEMO_USER,
         "META_BACKEND": os.environ.get("META_BACKEND", "mock"),
-        "DBQUERY_MODEL_ID": os.environ.get("DBQUERY_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+        "DBQUERY_MODEL_ID": os.environ.get("DBQUERY_MODEL_ID", "global.anthropic.claude-sonnet-4-6"),
         "DBQUERY_TEMPERATURE": os.environ.get("DBQUERY_TEMPERATURE", "0.1"),
         "DBQUERY_MAX_TOKENS": os.environ.get("DBQUERY_MAX_TOKENS", "4096"),
-        "ANALYZE_MODEL_ID": os.environ.get("ANALYZE_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+        "ANALYZE_MODEL_ID": os.environ.get("ANALYZE_MODEL_ID", "global.anthropic.claude-sonnet-4-6"),
         "ANALYZE_TEMPERATURE": os.environ.get("ANALYZE_TEMPERATURE", "0.1"),
         "ANALYZE_MAX_TOKENS": os.environ.get("ANALYZE_MAX_TOKENS", "2048"),
         "LARGE_TABLE_THRESHOLD": os.environ.get("LARGE_TABLE_THRESHOLD", "1000000"),
         # C1: Gateway + OAuth provider 관련 변수
         "TOOLS_SOURCE": os.environ.get("TOOLS_SOURCE", "gateway"),
         "GATEWAY_URL": os.environ.get("GATEWAY_URL", ""),
-        "OAUTH_PROVIDER_NAME": os.environ.get("OAUTH_PROVIDER_NAME", OAUTH_PROVIDER_NAME),
+        # 항상 DEMO_USER 파생값 — attach_oauth_provider가 만드는 provider명과 동일(컨테이너↔provider 일치).
+        # .env 의 stale OAUTH_PROVIDER_NAME(다른 DEMO_USER로 배포된 잔재)에 의존하면 불일치가 박힌다.
+        "OAUTH_PROVIDER_NAME": OAUTH_PROVIDER_NAME,
         "COGNITO_GATEWAY_SCOPE": os.environ.get("COGNITO_GATEWAY_SCOPE", ""),
     }
 
@@ -258,8 +260,14 @@ def main() -> None:
     print(f"{YELLOW}[4/6] 실행 role에 bedrock:InvokeModel 부착{NC}")
     attach_bedrock_policy(result.agent_id)
 
-    print(f"{YELLOW}[5/6] OAuth2CredentialProvider + 추가 IAM 권한 부착{NC}")
-    attach_oauth_provider(result.agent_id)
+    # OAuth2 provider 는 gateway 모드일 때만 필요 — inprocess 단독 배포(Phase 2)는
+    # Cognito/Gateway 불필요. TOOLS_SOURCE 기본값(gateway)을 그대로 두면 Phase 3 흐름.
+    tools_source = os.environ.get("TOOLS_SOURCE", "gateway")
+    if tools_source == "gateway":
+        print(f"{YELLOW}[5/6] OAuth2CredentialProvider + 추가 IAM 권한 부착 (gateway 모드){NC}")
+        attach_oauth_provider(result.agent_id)
+    else:
+        print(f"{YELLOW}[5/6] OAuth2 설정 skip — TOOLS_SOURCE={tools_source} (Cognito/Gateway 불필요){NC}")
 
     print(f"{YELLOW}[6/6] READY 대기{NC}")
     wait_until_ready(result.agent_id)
