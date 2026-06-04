@@ -20,7 +20,7 @@ def _analyze_model():
     """분석 전용 BedrockModel (ANALYZE_* 구성)."""
     return build_bedrock_model(
         model_id_env="ANALYZE_MODEL_ID",
-        default_model="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        default_model="global.anthropic.claude-sonnet-4-6",
         temp_env="ANALYZE_TEMPERATURE", default_temp=0.1,
         max_tok_env="ANALYZE_MAX_TOKENS", default_max_tok=2048,
         cache_tools=False,

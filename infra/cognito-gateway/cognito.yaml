@@ -11,6 +11,10 @@ Parameters:
     AllowedPattern: '^[a-zA-Z0-9-]{1,16}$'
     MinLength: 1
     MaxLength: 16
+  AnalyzeModelId:
+    Type: String
+    Description: Bedrock model id for the analyze Lambda (matches .env ANALYZE_MODEL_ID, env-driven).
+    Default: global.anthropic.claude-sonnet-4-6
 
 Resources:
 
@@ -164,6 +168,9 @@ Resources:
           DEMO_USER: !Ref DemoUser
           # /var/task 는 읽기전용 → EXPLAIN용 sample.db 를 쓰기가능한 /tmp 에 빌드(inprocess와 parity).
           DB_PATH: /tmp/dbq-sample.db
+          # 모델 env-driven — root .env 의 ANALYZE_MODEL_ID 를 deploy.sh 가 CFN 파라미터로 전달
+          # (코드 기본값에만 의존하지 않음 — Runtime 과 동일한 env 노브).
+          ANALYZE_MODEL_ID: !Ref AnalyzeModelId
 
   # === IAM — Gateway execution role ===================================
 

@@ -116,7 +116,8 @@ aws cloudformation deploy \
     --template-file "$PROJECT_ROOT/infra/cognito-gateway/cognito.packaged.yaml" \
     --stack-name "$STACK" \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-overrides "DemoUser=${DEMO_USER}"
+    --parameter-overrides "DemoUser=${DEMO_USER}" \
+        "AnalyzeModelId=${ANALYZE_MODEL_ID:-global.anthropic.claude-sonnet-4-6}"
 
 # ── 4. CFN outputs 환경변수 export ──────────────
 log "CFN outputs 캡처"

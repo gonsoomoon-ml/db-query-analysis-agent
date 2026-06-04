@@ -39,7 +39,7 @@ def create_agent(tools: list, system_prompt_filename: str) -> Agent:
     """Strands Agent 생성. model_id/temp/max_tokens는 DBQUERY_* env."""
     model = build_bedrock_model(
         model_id_env="DBQUERY_MODEL_ID",
-        default_model="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        default_model="global.anthropic.claude-sonnet-4-6",
         temp_env="DBQUERY_TEMPERATURE", default_temp=0.1,
         max_tok_env="DBQUERY_MAX_TOKENS", default_max_tok=4096,
     )
